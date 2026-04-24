@@ -30,7 +30,7 @@ jobs:
           java-version: "17"
 
       - name: Build jar
-        run: python3 orchestrator-tester/scripts/build_jar.py
+        run: python3 scripts/build_jar.py
 
       - name: Publish jar release asset
         id: release
@@ -39,7 +39,7 @@ jobs:
         run: |
           set -euo pipefail
           TAG="orchestrator-tester-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          JAR_PATH="orchestrator-tester/build/orchestrator-tester.jar"
+          JAR_PATH="build/orchestrator-tester.jar"
           gh release create "$TAG" "$JAR_PATH" \
             --title "orchestrator-tester ${GITHUB_RUN_ID}" \
             --notes "Automated release for Specmatic orchestrator testing"

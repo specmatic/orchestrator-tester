@@ -11,9 +11,6 @@ It is intentionally simple:
 4. Consolidate them into `consolidated_output/summary.json` and `summary.html`.
 5. Send the callback back to the side project.
 
-This directory is meant to be copied into a separate repository if you want a
-real standalone tester project.
-
 ## Structure
 
 - `src/Main.java`: tiny Java entrypoint for the jar
@@ -25,33 +22,36 @@ real standalone tester project.
 ## Local run
 
 ```bash
-python3 orchestrator-tester/scripts/local_demo.py
+python3 scripts/local_demo.py
 ```
 
-That uses sample test outputs and the same callback bridge as the orchestrator.
+That simulates the production flow locally:
+
+- builds the jar
+- runs three sample test sources from `resources/test-executor.json`
+- writes `outputs/` and `consolidated_output/`
+- sends the callback to a local fake GitHub server
 
 ## Local testing
 
 To build just the jar:
 
 ```bash
-python3 orchestrator-tester/scripts/build_jar.py
+python3 scripts/build_jar.py
 ```
 
 To exercise the full local dry-run:
 
 ```bash
-python3 orchestrator-tester/scripts/local_demo.py
+python3 scripts/local_demo.py
 ```
 
 That local run:
 
-- builds `orchestrator-tester/build/orchestrator-tester.jar`
-- starts a localhost server
-- feeds a fake trigger into the shared orchestrator
-- uses `orchestrator-tester/resources/test-executor.json`
+- builds `build/orchestrator-tester.jar`
+- uses `resources/test-executor.json`
 - generates `outputs/` and `consolidated_output/`
-- prints the callback payloads
+- prints the callback payloads captured by the local server
 
 ## Result profiles
 
