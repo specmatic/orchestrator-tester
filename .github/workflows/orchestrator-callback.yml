@@ -1,0 +1,36 @@
+name: Orchestrator Callback
+
+on:
+  repository_dispatch:
+    types:
+      - specmatic-orchestrator-finished
+
+permissions:
+  contents: read
+
+jobs:
+  receive-callback:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print callback payload
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text(encoding="utf-8"))
+          print("Callback event payload:")
+          print(json.dumps(event, indent=2, sort_keys=True))
+
+          client_payload = event.get("client_payload", {})
+          print("Callback client payload:")
+          print(json.dumps(client_payload, indent=2, sort_keys=True))
+
+          status = str(client_payload.get("status", "failure")).strip().lower()
+          print(f"Callback status: {status}")
+          if status not in {"success", "neutral"}:
+              raise SystemExit(1)
+          PY
+
