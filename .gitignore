@@ -1,0 +1,5 @@
+build/
+outputs/
+consolidated_output/
+__pycache__/
+*.pyc

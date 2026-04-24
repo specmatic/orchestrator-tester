@@ -1,0 +1,65 @@
+name: Build and Trigger Orchestrator
+
+on:
+  workflow_dispatch:
+    inputs:
+      orchestrator_repository:
+        description: Repository that hosts the orchestrator workflow
+        required: false
+        default: specmatic/specmatic-tests-orchestrator
+        type: string
+      orchestrator_event_type:
+        description: repository_dispatch event type to send
+        required: false
+        default: specmatic-enterprise-jar-ready
+        type: string
+
+jobs:
+  build-and-trigger:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout orchestrator-tester
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Build jar
+        run: python3 orchestrator-tester/scripts/build_jar.py
+
+      - name: Publish jar release asset
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="orchestrator-tester-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          JAR_PATH="orchestrator-tester/build/orchestrator-tester.jar"
+          gh release create "$TAG" "$JAR_PATH" \
+            --title "orchestrator-tester ${GITHUB_RUN_ID}" \
+            --notes "Automated release for Specmatic orchestrator testing"
+          JAR_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/orchestrator-tester.jar"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "jar_url=$JAR_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Trigger orchestrator
+        env:
+          GH_TOKEN: ${{ secrets.ORCHESTRATOR_TRIGGER_TOKEN }}
+          ORCHESTRATOR_REPOSITORY: ${{ inputs.orchestrator_repository }}
+          ORCHESTRATOR_EVENT_TYPE: ${{ inputs.orchestrator_event_type }}
+          JAR_URL: ${{ steps.release.outputs.jar_url }}
+        run: |
+          set -euo pipefail
+          gh api "repos/${ORCHESTRATOR_REPOSITORY}/dispatches" \
+            -X POST \
+            -f "event_type=${ORCHESTRATOR_EVENT_TYPE}" \
+            -f "client_payload[jar_url]=${JAR_URL}" \
+            -f "client_payload[enterprise_repository]=${GITHUB_REPOSITORY}" \
+            -f "client_payload[enterprise_sha]=${GITHUB_SHA}" \
+            -f "client_payload[enterprise_run_id]=${GITHUB_RUN_ID}" \
+            -f "client_payload[enterprise_run_attempt]=${GITHUB_RUN_ATTEMPT}"
