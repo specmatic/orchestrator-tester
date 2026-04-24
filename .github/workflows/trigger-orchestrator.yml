@@ -55,6 +55,11 @@ jobs:
           JAR_URL: ${{ steps.release.outputs.jar_url }}
         run: |
           set -euo pipefail
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "Missing ORCHESTRATOR_TRIGGER_TOKEN repository secret."
+            echo "Add a fine-grained PAT or GitHub App token with access to specmatic/specmatic-tests-orchestrator."
+            exit 1
+          fi
           gh api "repos/${ORCHESTRATOR_REPOSITORY}/dispatches" \
             -X POST \
             -f "event_type=${ORCHESTRATOR_EVENT_TYPE}" \
