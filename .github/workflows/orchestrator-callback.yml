@@ -23,16 +23,22 @@ jobs:
           def pretty_json(value: object) -> str:
               return json.dumps(value, indent=2, sort_keys=True, ensure_ascii=False)
 
+          def marker(passed: bool) -> str:
+              return "✅" if passed else "❌"
+
           event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text(encoding="utf-8"))
 
           client_payload = event.get("client_payload", {})
 
           event_type = str(event.get("action", "")).strip()
           status = str(client_payload.get("status", "failure")).strip().lower()
-          result_banner = "PASS" if status in {"success", "neutral"} else "FAIL"
+          passed = status in {"success", "neutral"}
+          result_banner = "PASS" if passed else "FAIL"
 
           summary_lines = [
-              f"# Orchestrator callback: {result_banner}",
+              f"# {marker(passed)} Orchestrator callback: {result_banner}",
+              "",
+              "## Callback Overview",
               "",
               f"- Event: `{event_type}`",
               f"- Status: `{status}`",
@@ -43,11 +49,53 @@ jobs:
               f"- Orchestrator run: `{client_payload.get('orchestrator_run_id', '')}` attempt `{client_payload.get('orchestrator_run_attempt', '')}`",
           ]
           if execution_error := client_payload.get("execution_error"):
-              summary_lines.extend(["", f"- Execution error: `{execution_error}`"])
+              summary_lines.extend(["", "## Execution Error", "", "```text", str(execution_error), "```"])
+
+          summary_json = client_payload.get("summary_json")
+          if summary_json not in (None, ""):
+              summary_lines.extend(["", "## Summary JSON"])
+              try:
+                  parsed_summary = json.loads(summary_json)
+              except json.JSONDecodeError:
+                  summary_lines.extend(["", "```text"] + str(summary_json).splitlines() + ["```"])
+              else:
+                  summary_lines.extend([
+                      "",
+                      "### Totals",
+                      "",
+                  ])
+                  if isinstance(parsed_summary, dict):
+                      totals = parsed_summary.get("totals", {})
+                      if isinstance(totals, dict):
+                          summary_lines.extend([
+                              f"- Conclusion: {marker(str(parsed_summary.get('conclusion', '')).strip().lower() in {'success', 'neutral'})} `{parsed_summary.get('conclusion', '')}`",
+                              f"- Sources: `{totals.get('sources', '')}`",
+                              f"- Passed sources: `{totals.get('passed_sources', '')}`",
+                              f"- Failed sources: `{totals.get('failed_sources', '')}`",
+                              f"- Tests: `{totals.get('tests', '')}`",
+                              f"- Passed tests: `{totals.get('passed_tests', '')}`",
+                              f"- Failed tests: `{totals.get('failed_tests', '')}`",
+                          ])
+                      sources = parsed_summary.get("sources", [])
+                      if isinstance(sources, list) and sources:
+                          summary_lines.extend(["", "### Sources", "", "| Type | Name | Status | Passed | Failed | Total |", "| --- | --- | --- | ---: | ---: | ---: |"])
+                          for source in sources:
+                              if not isinstance(source, dict):
+                                  continue
+                              source_info = source.get("source", {})
+                              run_info = source.get("run", {})
+                              source_type = source_info.get("type", "")
+                              source_name = source_info.get("name", "")
+                              source_passed = bool(run_info.get("passed", False))
+                              summary_lines.append(
+                                  f"| {source_type} | {source_name} | {marker(source_passed)} {'PASS' if source_passed else 'FAIL'} | {run_info.get('passed_count', '')} | {run_info.get('failed_count', '')} | {run_info.get('total', '')} |"
+                              )
+                  summary_lines.extend(["", "### Raw summary_json", "", "```json"] + pretty_json(parsed_summary).splitlines() + ["```"])
+
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as handle:
               handle.write("\n".join(summary_lines) + "\n")
 
-          print(f"RESULT: {result_banner}")
+          print(f"RESULT: {marker(passed)} {result_banner}")
           print("Callback summary")
           print(f"  event_type: {event_type}")
           print(f"  status: {status}")
