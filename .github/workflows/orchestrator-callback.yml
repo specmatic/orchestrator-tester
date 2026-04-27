@@ -3,7 +3,6 @@ name: Orchestrator Callback
 on:
   repository_dispatch:
     types:
-      - specmatic-orchestrator-started
       - specmatic-orchestrator-finished
 
 permissions:
@@ -34,8 +33,6 @@ jobs:
           print(f"Callback event type: {event_type}")
           print(f"Callback status: {status}")
 
-          if event_type == "specmatic-orchestrator-started":
-              raise SystemExit(0)
           if status not in {"success", "neutral"}:
               raise SystemExit(1)
           PY
