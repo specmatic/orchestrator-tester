@@ -24,10 +24,36 @@ jobs:
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
     permissions:
+      checks: write
       contents: write
     steps:
       - name: Checkout orchestrator-tester
         uses: actions/checkout@v5
+
+      - name: Create pending orchestrator check
+        id: pending-check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          response=$(gh api repos/${GITHUB_REPOSITORY}/check-runs -X POST \
+            -f name="Orchestrator Gate" \
+            -f head_sha="${GITHUB_SHA}" \
+            -f status="in_progress" \
+            -f details_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+            -f output[title]="Orchestrator Gate" \
+            -f output[summary]="Waiting for orchestrator callback.")
+          check_run_id=$(python3 -c 'import json,sys; print(json.loads(sys.stdin.read())["id"])' <<<"$response")
+          check_run_url=$(python3 -c 'import json,sys; print(json.loads(sys.stdin.read())["html_url"])' <<<"$response")
+          echo "check_run_id=$check_run_id" >> "$GITHUB_OUTPUT"
+          echo "check_run_url=$check_run_url" >> "$GITHUB_OUTPUT"
+          echo "Created pending check run: $check_run_url"
+          {
+            echo "## Orchestrator Gate"
+            echo ""
+            echo "- Pending check: [$check_run_id]($check_run_url)"
+            echo "- Status: in_progress"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Set up Java
         uses: actions/setup-java@v5
@@ -59,6 +85,8 @@ jobs:
           ORCHESTRATOR_REPOSITORY: ${{ inputs.orchestrator_repository }}
           ORCHESTRATOR_EVENT_TYPE: ${{ inputs.orchestrator_event_type }}
           ORCHESTRATOR_TEST_EXECUTOR_PATH: ${{ inputs.ORCHESTRATOR_TEST_EXECUTOR_PATH }}
+          ENTERPRISE_CHECK_RUN_ID: ${{ steps.pending-check.outputs.check_run_id }}
+          ENTERPRISE_CHECK_RUN_URL: ${{ steps.pending-check.outputs.check_run_url }}
           JAR_URL: ${{ steps.release.outputs.jar_url }}
         run: |
           set -euo pipefail
@@ -81,6 +109,9 @@ jobs:
                   "enterprise_run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
               },
           }
+          enterprise_check_run_id = os.environ.get("ENTERPRISE_CHECK_RUN_ID", "").strip()
+          if enterprise_check_run_id:
+              payload["client_payload"]["enterprise_check_run_id"] = enterprise_check_run_id
           test_executor_path = os.environ.get("ORCHESTRATOR_TEST_EXECUTOR_PATH", "").strip()
           if test_executor_path:
               payload["client_payload"]["test_executor_path"] = test_executor_path
@@ -98,6 +129,9 @@ jobs:
             -f "client_payload[enterprise_run_id]=${GITHUB_RUN_ID}"
             -f "client_payload[enterprise_run_attempt]=${GITHUB_RUN_ATTEMPT}"
           )
+          if [ -n "${ENTERPRISE_CHECK_RUN_ID:-}" ]; then
+            args+=(-f "client_payload[enterprise_check_run_id]=${ENTERPRISE_CHECK_RUN_ID}")
+          fi
           if [ -n "${ORCHESTRATOR_TEST_EXECUTOR_PATH:-}" ]; then
             args+=(-f "client_payload[test_executor_path]=${ORCHESTRATOR_TEST_EXECUTOR_PATH}")
           fi

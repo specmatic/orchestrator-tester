@@ -6,11 +6,14 @@ on:
       - specmatic-orchestrator-finished
 
 permissions:
+  checks: write
   contents: read
 
 jobs:
   receive-callback:
     runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
     steps:
       - name: Print callback payload
         run: |
@@ -18,6 +21,7 @@ jobs:
           python3 - <<'PY'
           import json
           import os
+          import urllib.request
           from pathlib import Path
 
           def pretty_json(value: object) -> str:
@@ -45,6 +49,17 @@ jobs:
                       return value
               return default
 
+          def github_request(method: str, url: str, token: str, payload: dict[str, object] | None = None) -> dict[str, object]:
+              data = None if payload is None else json.dumps(payload).encode("utf-8")
+              request = urllib.request.Request(url, data=data, method=method)
+              request.add_header("Accept", "application/vnd.github+json")
+              request.add_header("Authorization", f"Bearer {token}")
+              request.add_header("X-GitHub-Api-Version", "2022-11-28")
+              request.add_header("Content-Type", "application/json")
+              with urllib.request.urlopen(request, timeout=60) as response:
+                  response_body = response.read().decode("utf-8")
+                  return json.loads(response_body) if response_body else {}
+
           event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text(encoding="utf-8"))
 
           client_payload = event.get("client_payload", {})
@@ -71,6 +86,7 @@ jobs:
               summary_lines.extend(["", "## Execution Error", "", "```text", str(execution_error), "```"])
 
           summary_json = client_payload.get("summary_json")
+          parsed_summary: object = {}
           if summary_json not in (None, ""):
               summary_lines.extend(["", "## Orchestrator Summary"])
               try:
@@ -118,6 +134,73 @@ jobs:
 
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as handle:
               handle.write("\n".join(summary_lines) + "\n")
+
+          enterprise_check_run_id = str(client_payload.get("enterprise_check_run_id", "")).strip()
+          if not enterprise_check_run_id or enterprise_check_run_id == "null":
+              enterprise_sha = str(client_payload.get("enterprise_sha", "")).strip()
+              if enterprise_sha:
+                  response = github_request(
+                      "GET",
+                      f"https://api.github.com/repos/{os.environ['GITHUB_REPOSITORY']}/commits/{enterprise_sha}/check-runs",
+                      os.environ.get("GITHUB_TOKEN", ""),
+                      None,
+                  )
+                  for check_run in response.get("check_runs", []) if isinstance(response, dict) else []:
+                      if not isinstance(check_run, dict):
+                          continue
+                      if str(check_run.get("name", "")).strip() != "Orchestrator Gate":
+                          continue
+                      if str(check_run.get("status", "")).strip().lower() == "completed":
+                          continue
+                      enterprise_check_run_id = str(check_run.get("id", "")).strip()
+                      break
+
+          if enterprise_check_run_id and enterprise_check_run_id != "null":
+              conclusion = "success" if passed else "failure"
+              totals = parsed_summary.get("totals", {}) if isinstance(parsed_summary, dict) else {}
+              check_summary = [
+                  f"{marker(passed)} Orchestrator callback: {result_banner}",
+                  f"Status: {status}",
+                  f"Phase: {client_payload.get('phase', '')}",
+              ]
+              if isinstance(totals, dict) and totals:
+                  check_summary.extend([
+                      f"Sources: {totals.get('sources', parsed_summary.get('total_sources', '') if isinstance(parsed_summary, dict) else '')}",
+                      f"Passed sources: {totals.get('passed_sources', '')}",
+                      f"Failed sources: {totals.get('failed_sources', '')}",
+                      f"Tests: {totals.get('tests', parsed_summary.get('total', '') if isinstance(parsed_summary, dict) else '')}",
+                      f"Passed tests: {totals.get('passed_tests', '')}",
+                      f"Failed tests: {totals.get('failed_tests', '')}",
+                  ])
+              if execution_error not in (None, ""):
+                  check_summary.append(f"Execution error: {execution_error}")
+              patch_response = github_request(
+                  "PATCH",
+                  f"https://api.github.com/repos/{os.environ['GITHUB_REPOSITORY']}/check-runs/{enterprise_check_run_id}",
+                  os.environ.get("GITHUB_TOKEN", ""),
+                  {
+                      "status": "completed",
+                      "conclusion": conclusion,
+                      "details_url": client_payload.get("orchestrator_run_url", ""),
+                      "output": {
+                          "title": "Orchestrator Gate",
+                          "summary": "\n".join(check_summary),
+                      },
+                  },
+              )
+              check_url = str(patch_response.get("html_url", "")).strip() if isinstance(patch_response, dict) else ""
+              if check_url:
+                  with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as handle:
+                      handle.write("\n".join([
+                          "",
+                          "## Completed Orchestrator Gate",
+                          "",
+                          f"- Result: {marker(passed)} {result_banner}",
+                          f"- Check: [Orchestrator Gate]({check_url})",
+                          f"- Conclusion: `{conclusion}`",
+                      ]) + "\n")
+          else:
+              print("No pending Orchestrator Gate check found to finalize.")
 
           print(f"RESULT: {marker(passed)} {result_banner}")
           print("Callback summary")
