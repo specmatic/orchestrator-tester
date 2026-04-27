@@ -26,6 +26,25 @@ jobs:
           def marker(passed: bool) -> str:
               return "✅" if passed else "❌"
 
+          def md(value: object) -> str:
+              text = "" if value is None else str(value)
+              return text.replace("|", "\\|").replace("\n", " ").strip()
+
+          def read_path(data: object, path: tuple[str, ...], default: object = "") -> object:
+              current = data
+              for key in path:
+                  if not isinstance(current, dict) or key not in current:
+                      return default
+                  current = current[key]
+              return default if current is None else current
+
+          def first_value(data: object, *paths: tuple[str, ...], default: object = "") -> object:
+              for path in paths:
+                  value = read_path(data, path, default=None)
+                  if value not in (None, ""):
+                      return value
+              return default
+
           event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text(encoding="utf-8"))
 
           client_payload = event.get("client_payload", {})
@@ -40,13 +59,13 @@ jobs:
               "",
               "## Callback Overview",
               "",
-              f"- Event: `{event_type}`",
-              f"- Status: `{status}`",
-              f"- Phase: `{client_payload.get('phase', '')}`",
-              f"- Enterprise repo: `{client_payload.get('enterprise_repository', '')}`",
-              f"- Enterprise SHA: `{client_payload.get('enterprise_sha', '')}`",
-              f"- Enterprise run: `{client_payload.get('enterprise_run_id', '')}` attempt `{client_payload.get('enterprise_run_attempt', '')}`",
-              f"- Orchestrator run: `{client_payload.get('orchestrator_run_id', '')}` attempt `{client_payload.get('orchestrator_run_attempt', '')}`",
+              f"- Event: `{md(event_type)}`",
+              f"- Status: `{md(status)}`",
+              f"- Phase: `{md(client_payload.get('phase', ''))}`",
+              f"- Enterprise repo: `{md(client_payload.get('enterprise_repository', ''))}`",
+              f"- Enterprise SHA: `{md(client_payload.get('enterprise_sha', ''))}`",
+              f"- Enterprise run: `{md(client_payload.get('enterprise_run_id', ''))}` attempt `{md(client_payload.get('enterprise_run_attempt', ''))}`",
+              f"- Orchestrator run: `{md(client_payload.get('orchestrator_run_id', ''))}` attempt `{md(client_payload.get('orchestrator_run_attempt', ''))}`",
           ]
           if execution_error := client_payload.get("execution_error"):
               summary_lines.extend(["", "## Execution Error", "", "```text", str(execution_error), "```"])
@@ -59,36 +78,41 @@ jobs:
               except json.JSONDecodeError:
                   summary_lines.extend(["", "```text"] + str(summary_json).splitlines() + ["```"])
               else:
-                  summary_lines.extend([
-                      "",
-                      "### Totals",
-                      "",
-                  ])
                   if isinstance(parsed_summary, dict):
-                      totals = parsed_summary.get("totals", {})
-                      if isinstance(totals, dict):
-                          summary_lines.extend([
-                              f"- Conclusion: {marker(str(parsed_summary.get('conclusion', '')).strip().lower() in {'success', 'neutral'})} `{parsed_summary.get('conclusion', '')}`",
-                              f"- Sources: `{totals.get('sources', '')}`",
-                              f"- Passed sources: `{totals.get('passed_sources', '')}`",
-                              f"- Failed sources: `{totals.get('failed_sources', '')}`",
-                              f"- Tests: `{totals.get('tests', '')}`",
-                              f"- Passed tests: `{totals.get('passed_tests', '')}`",
-                              f"- Failed tests: `{totals.get('failed_tests', '')}`",
-                          ])
+                      conclusion = str(first_value(parsed_summary, ("conclusion",), ("status",), default="")).strip().lower()
+                      summary_lines.extend([
+                          "",
+                          "### Totals",
+                          "",
+                          f"- Conclusion: {marker(conclusion in {'success', 'neutral', 'passed'})} `{md(conclusion or first_value(parsed_summary, ('conclusion',), ('status',), default=''))}`",
+                          f"- Sources: `{md(first_value(parsed_summary, ('total_sources',), ('totals', 'sources'), default=''))}`",
+                          f"- Passed sources: `{md(first_value(parsed_summary, ('passed_sources',), ('totals', 'passed_sources'), default=''))}`",
+                          f"- Failed sources: `{md(first_value(parsed_summary, ('failed_sources',), ('totals', 'failed_sources'), default=''))}`",
+                          f"- Tests: `{md(first_value(parsed_summary, ('total',), ('totals', 'tests'), default=''))}`",
+                          f"- Passed tests: `{md(first_value(parsed_summary, ('passed_count',), ('totals', 'passed_tests'), default=''))}`",
+                          f"- Failed tests: `{md(first_value(parsed_summary, ('failed_count',), ('totals', 'failed_tests'), default=''))}`",
+                      ])
                       sources = parsed_summary.get("sources", [])
                       if isinstance(sources, list) and sources:
-                          summary_lines.extend(["", "### Sources", "", "| Type | Name | Status | Passed | Failed | Total |", "| --- | --- | --- | ---: | ---: | ---: |"])
+                          summary_lines.extend([
+                              "",
+                              "### Sources",
+                              "",
+                              "| Type | Name | Description | Status | Passed | Failed | Total |",
+                              "| --- | --- | --- | --- | ---: | ---: | ---: |",
+                          ])
                           for source in sources:
                               if not isinstance(source, dict):
                                   continue
-                              source_info = source.get("source", {})
-                              run_info = source.get("run", {})
-                              source_type = source_info.get("type", "")
-                              source_name = source_info.get("name", "")
-                              source_passed = bool(run_info.get("passed", False))
+                              source_type = first_value(source, ("type",), ("source", "type"), ("details", "type"), default="")
+                              source_name = first_value(source, ("name",), ("source", "name"), ("details", "name"), ("details", "source"), default="")
+                              source_description = first_value(source, ("description",), ("source", "description"), ("details", "description"), default="")
+                              source_passed = bool(first_value(source, ("passed",), ("run", "passed"), ("details", "passed"), default=False))
+                              passed_count = first_value(source, ("passed_count",), ("run", "passed_count"), default="")
+                              failed_count = first_value(source, ("failed_count",), ("run", "failed_count"), default="")
+                              total = first_value(source, ("total",), ("run", "total"), default="")
                               summary_lines.append(
-                                  f"| {source_type} | {source_name} | {marker(source_passed)} {'PASS' if source_passed else 'FAIL'} | {run_info.get('passed_count', '')} | {run_info.get('failed_count', '')} | {run_info.get('total', '')} |"
+                                  f"| {md(source_type)} | {md(source_name)} | {md(source_description)} | {marker(source_passed)} {'PASS' if source_passed else 'FAIL'} | {md(passed_count)} | {md(failed_count)} | {md(total)} |"
                               )
                   summary_lines.extend(["", "### Raw summary_json", "", "```json"] + pretty_json(parsed_summary).splitlines() + ["```"])
 
