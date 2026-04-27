@@ -20,18 +20,66 @@ jobs:
           import os
           from pathlib import Path
 
+          def pretty_json(value: object) -> str:
+              return json.dumps(value, indent=2, sort_keys=True, ensure_ascii=False)
+
           event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text(encoding="utf-8"))
-          print("Callback event payload:")
-          print(json.dumps(event, indent=2, sort_keys=True))
 
           client_payload = event.get("client_payload", {})
-          print("Callback client payload:")
-          print(json.dumps(client_payload, indent=2, sort_keys=True))
 
           event_type = str(event.get("action", "")).strip()
           status = str(client_payload.get("status", "failure")).strip().lower()
-          print(f"Callback event type: {event_type}")
-          print(f"Callback status: {status}")
+          result_banner = "PASS" if status in {"success", "neutral"} else "FAIL"
+
+          summary_lines = [
+              f"# Orchestrator callback: {result_banner}",
+              "",
+              f"- Event: `{event_type}`",
+              f"- Status: `{status}`",
+              f"- Phase: `{client_payload.get('phase', '')}`",
+              f"- Enterprise repo: `{client_payload.get('enterprise_repository', '')}`",
+              f"- Enterprise SHA: `{client_payload.get('enterprise_sha', '')}`",
+              f"- Enterprise run: `{client_payload.get('enterprise_run_id', '')}` attempt `{client_payload.get('enterprise_run_attempt', '')}`",
+              f"- Orchestrator run: `{client_payload.get('orchestrator_run_id', '')}` attempt `{client_payload.get('orchestrator_run_attempt', '')}`",
+          ]
+          if execution_error := client_payload.get("execution_error"):
+              summary_lines.extend(["", f"- Execution error: `{execution_error}`"])
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as handle:
+              handle.write("\n".join(summary_lines) + "\n")
+
+          print(f"RESULT: {result_banner}")
+          print("Callback summary")
+          print(f"  event_type: {event_type}")
+          print(f"  status: {status}")
+          print(f"  phase: {client_payload.get('phase', '')}")
+          print(f"  enterprise_repository: {client_payload.get('enterprise_repository', '')}")
+          print(f"  enterprise_sha: {client_payload.get('enterprise_sha', '')}")
+          print(f"  enterprise_run_id: {client_payload.get('enterprise_run_id', '')}")
+          print(f"  enterprise_run_attempt: {client_payload.get('enterprise_run_attempt', '')}")
+          print(f"  orchestrator_run_url: {client_payload.get('orchestrator_run_url', '')}")
+          print(f"  orchestrator_run_id: {client_payload.get('orchestrator_run_id', '')}")
+          print(f"  orchestrator_run_attempt: {client_payload.get('orchestrator_run_attempt', '')}")
+
+          execution_error = client_payload.get("execution_error")
+          if execution_error not in (None, ""):
+              print("  execution_error:")
+              print(f"    {execution_error}")
+
+          summary_json = client_payload.get("summary_json")
+          if summary_json not in (None, ""):
+              print("  summary_json:")
+              try:
+                  parsed_summary = json.loads(summary_json)
+              except json.JSONDecodeError:
+                  print("    <invalid JSON>")
+                  for line in str(summary_json).splitlines():
+                      print(f"    {line}")
+              else:
+                  for line in pretty_json(parsed_summary).splitlines():
+                      print(f"    {line}")
+
+          print("Callback payload (top-level keys):")
+          print(f"  {', '.join(sorted(event.keys()))}")
 
           if status not in {"success", "neutral"}:
               raise SystemExit(1)
