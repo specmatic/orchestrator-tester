@@ -83,6 +83,7 @@ The intended production flow in a standalone `orchestrator-tester` repository is
    - `enterprise_sha`
    - `enterprise_run_id`
    - `enterprise_run_attempt`
+   - optional `ORCHESTRATOR_TEST_EXECUTOR_PATH` if you want the orchestrator to use a non-default manifest
 4. Let the orchestrator run the sample test sources and call back.
 
 The workflow file in [`.github/workflows/trigger-orchestrator.yml`](./.github/workflows/trigger-orchestrator.yml) now does this by:
@@ -90,6 +91,7 @@ The workflow file in [`.github/workflows/trigger-orchestrator.yml`](./.github/wo
 - building the jar
 - creating a release asset for `orchestrator-tester.jar`
 - using the release asset download URL as `jar_url`
+- optionally forwarding `ORCHESTRATOR_TEST_EXECUTOR_PATH` when you want to test a specific manifest in the orchestrator repo
 - dispatching `specmatic/specmatic-tests-orchestrator`
 
 ## Test in GitHub Actions

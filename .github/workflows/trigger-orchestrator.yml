@@ -13,6 +13,10 @@ on:
         required: false
         default: specmatic-enterprise-jar-ready
         type: string
+      ORCHESTRATOR_TEST_EXECUTOR_PATH:
+        description: Optional manifest path for orchestrator scenario testing
+        required: false
+        type: string
 
 jobs:
   build-and-trigger:
@@ -52,6 +56,7 @@ jobs:
           GH_TOKEN: ${{ secrets.SPECMATIC_GITHUB_TOKEN }}
           ORCHESTRATOR_REPOSITORY: ${{ inputs.orchestrator_repository }}
           ORCHESTRATOR_EVENT_TYPE: ${{ inputs.orchestrator_event_type }}
+          ORCHESTRATOR_TEST_EXECUTOR_PATH: ${{ inputs.ORCHESTRATOR_TEST_EXECUTOR_PATH }}
           JAR_URL: ${{ steps.release.outputs.jar_url }}
         run: |
           set -euo pipefail
@@ -74,14 +79,24 @@ jobs:
                   "enterprise_run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
               },
           }
+          test_executor_path = os.environ.get("ORCHESTRATOR_TEST_EXECUTOR_PATH", "").strip()
+          if test_executor_path:
+              payload["client_payload"]["test_executor_path"] = test_executor_path
           print("Repository dispatch payload:")
           print(json.dumps(payload, indent=2, sort_keys=True))
           PY
-          gh api "repos/${ORCHESTRATOR_REPOSITORY}/dispatches" \
-            -X POST \
-            -f "event_type=${ORCHESTRATOR_EVENT_TYPE}" \
-            -f "client_payload[jar_url]=${JAR_URL}" \
-            -f "client_payload[enterprise_repository]=${GITHUB_REPOSITORY}" \
-            -f "client_payload[enterprise_sha]=${GITHUB_SHA}" \
-            -f "client_payload[enterprise_run_id]=${GITHUB_RUN_ID}" \
+          if [ -n "${ORCHESTRATOR_TEST_EXECUTOR_PATH:-}" ]; then
+            echo "Passing orchestrator manifest override: ${ORCHESTRATOR_TEST_EXECUTOR_PATH}"
+          fi
+          args=(
+            -f "event_type=${ORCHESTRATOR_EVENT_TYPE}"
+            -f "client_payload[jar_url]=${JAR_URL}"
+            -f "client_payload[enterprise_repository]=${GITHUB_REPOSITORY}"
+            -f "client_payload[enterprise_sha]=${GITHUB_SHA}"
+            -f "client_payload[enterprise_run_id]=${GITHUB_RUN_ID}"
             -f "client_payload[enterprise_run_attempt]=${GITHUB_RUN_ATTEMPT}"
+          )
+          if [ -n "${ORCHESTRATOR_TEST_EXECUTOR_PATH:-}" ]; then
+            args+=(-f "client_payload[test_executor_path]=${ORCHESTRATOR_TEST_EXECUTOR_PATH}")
+          fi
+          gh api "repos/${ORCHESTRATOR_REPOSITORY}/dispatches" -X POST "${args[@]}"
