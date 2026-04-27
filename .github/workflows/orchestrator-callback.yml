@@ -72,7 +72,7 @@ jobs:
 
           summary_json = client_payload.get("summary_json")
           if summary_json not in (None, ""):
-              summary_lines.extend(["", "## Summary JSON"])
+              summary_lines.extend(["", "## Orchestrator Summary"])
               try:
                   parsed_summary = json.loads(summary_json)
               except json.JSONDecodeError:
@@ -114,7 +114,7 @@ jobs:
                               summary_lines.append(
                                   f"| {md(source_type)} | {md(source_name)} | {md(source_description)} | {marker(source_passed)} {'PASS' if source_passed else 'FAIL'} | {md(passed_count)} | {md(failed_count)} | {md(total)} |"
                               )
-                  summary_lines.extend(["", "### Raw summary_json", "", "```json"] + pretty_json(parsed_summary).splitlines() + ["```"])
+                  summary_lines.extend(["", "## Raw summary_json", "", "```json"] + pretty_json(parsed_summary).splitlines() + ["```"])
 
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as handle:
               handle.write("\n".join(summary_lines) + "\n")
