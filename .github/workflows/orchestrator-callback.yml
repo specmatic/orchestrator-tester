@@ -49,6 +49,10 @@ jobs:
                       return value
               return default
 
+          def payload_report(payload: dict[str, object]) -> dict[str, object]:
+              report = payload.get("report")
+              return report if isinstance(report, dict) else {}
+
           def github_request(method: str, url: str, token: str, payload: dict[str, object] | None = None) -> dict[str, object]:
               data = None if payload is None else json.dumps(payload).encode("utf-8")
               request = urllib.request.Request(url, data=data, method=method)
@@ -63,6 +67,7 @@ jobs:
           event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text(encoding="utf-8"))
 
           client_payload = event.get("client_payload", {})
+          report = payload_report(client_payload) if isinstance(client_payload, dict) else {}
 
           event_type = str(event.get("action", "")).strip()
           status = str(client_payload.get("status", "failure")).strip().lower()
@@ -82,10 +87,10 @@ jobs:
               f"- Enterprise run: `{md(client_payload.get('enterprise_run_id', ''))}` attempt `{md(client_payload.get('enterprise_run_attempt', ''))}`",
               f"- Orchestrator run: `{md(client_payload.get('orchestrator_run_id', ''))}` attempt `{md(client_payload.get('orchestrator_run_attempt', ''))}`",
           ]
-          if execution_error := client_payload.get("execution_error"):
+          if execution_error := first_value(report, ("execution_error",), default=client_payload.get("execution_error")):
               summary_lines.extend(["", "## Execution Error", "", "```text", str(execution_error), "```"])
 
-          summary_json = client_payload.get("summary_json")
+          summary_json = first_value(report, ("summary_json",), default=client_payload.get("summary_json"))
           parsed_summary: object = {}
           if summary_json not in (None, ""):
               summary_lines.extend(["", "## Orchestrator Summary"])
@@ -135,7 +140,7 @@ jobs:
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as handle:
               handle.write("\n".join(summary_lines) + "\n")
 
-          enterprise_check_run_id = str(client_payload.get("enterprise_check_run_id", "")).strip()
+          enterprise_check_run_id = str(first_value(report, ("enterprise_check_run_id",), default=client_payload.get("enterprise_check_run_id", ""))).strip()
           if not enterprise_check_run_id or enterprise_check_run_id == "null":
               enterprise_sha = str(client_payload.get("enterprise_sha", "")).strip()
               if enterprise_sha:
@@ -172,6 +177,7 @@ jobs:
                       f"Passed tests: {totals.get('passed_tests', '')}",
                       f"Failed tests: {totals.get('failed_tests', '')}",
                   ])
+              execution_error = first_value(report, ("execution_error",), default=client_payload.get("execution_error"))
               if execution_error not in (None, ""):
                   check_summary.append(f"Execution error: {execution_error}")
               patch_response = github_request(
@@ -215,12 +221,12 @@ jobs:
           print(f"  orchestrator_run_id: {client_payload.get('orchestrator_run_id', '')}")
           print(f"  orchestrator_run_attempt: {client_payload.get('orchestrator_run_attempt', '')}")
 
-          execution_error = client_payload.get("execution_error")
+          execution_error = first_value(report, ("execution_error",), default=client_payload.get("execution_error"))
           if execution_error not in (None, ""):
               print("  execution_error:")
               print(f"    {execution_error}")
 
-          summary_json = client_payload.get("summary_json")
+          summary_json = first_value(report, ("summary_json",), default=client_payload.get("summary_json"))
           if summary_json not in (None, ""):
               print("  summary_json:")
               try:
