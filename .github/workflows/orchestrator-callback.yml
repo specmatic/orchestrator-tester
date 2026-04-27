@@ -3,6 +3,7 @@ name: Orchestrator Callback
 on:
   repository_dispatch:
     types:
+      - specmatic-orchestrator-started
       - specmatic-orchestrator-finished
 
 permissions:
@@ -28,9 +29,13 @@ jobs:
           print("Callback client payload:")
           print(json.dumps(client_payload, indent=2, sort_keys=True))
 
+          event_type = str(event.get("action", "")).strip()
           status = str(client_payload.get("status", "failure")).strip().lower()
+          print(f"Callback event type: {event_type}")
           print(f"Callback status: {status}")
+
+          if event_type == "specmatic-orchestrator-started":
+              raise SystemExit(0)
           if status not in {"success", "neutral"}:
               raise SystemExit(1)
           PY
-

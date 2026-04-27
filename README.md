@@ -49,6 +49,7 @@ python3 scripts/local_demo.py
 That local run:
 
 - builds `build/orchestrator-tester.jar`
+- uses the built jar's absolute file path as the jar reference
 - uses `resources/test-executor.json`
 - generates `outputs/` and `consolidated_output/`
 - prints the callback payloads captured by the local server
@@ -88,6 +89,7 @@ The workflow file in [`.github/workflows/trigger-orchestrator.yml`](./.github/wo
 
 - building the jar
 - creating a release asset for `orchestrator-tester.jar`
+- using the release asset download URL as `jar_url`
 - dispatching `specmatic/specmatic-tests-orchestrator`
 
 ## Test in GitHub Actions

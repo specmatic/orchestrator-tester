@@ -35,15 +35,12 @@ class LocalGitHubState:
         self.requests: list[CapturedRequest] = []
         self.lock = threading.Lock()
         self._events: dict[str, threading.Event] = {
-            "check-runs": threading.Event(),
             "dispatches": threading.Event(),
         }
 
     def add_request(self, method: str, path: str, body: dict[str, Any]) -> None:
         with self.lock:
             self.requests.append(CapturedRequest(method=method, path=path, body=body))
-            if path.endswith("/check-runs"):
-                self._events["check-runs"].set()
             if path.endswith("/dispatches"):
                 self._events["dispatches"].set()
 
@@ -302,10 +299,9 @@ def start_server(state: LocalGitHubState) -> tuple[ThreadingHTTPServer, str]:
 
 def main() -> int:
     jar_path = build_jar()
-    jar_bytes = jar_path.read_bytes()
-    state = LocalGitHubState(jar_bytes=jar_bytes)
+    state = LocalGitHubState(jar_bytes=jar_path.read_bytes())
     server, base_url = start_server(state)
-    jar_url = f"{base_url}/orchestrator-tester.jar"
+    jar_url = str(jar_path.resolve())
 
     try:
         ensure_clean_outputs()
@@ -315,7 +311,7 @@ def main() -> int:
         write_summary(summary)
         send_callback(base_url, summary)
 
-        if not state.wait_for("check-runs") or not state.wait_for("dispatches"):
+        if not state.wait_for("dispatches"):
             raise RuntimeError("Callback requests were not captured in time")
 
         print(f"Built jar: {jar_path}")
