@@ -1,9 +1,7 @@
 name: Orchestrator Callback
 
 on:
-  repository_dispatch:
-    types:
-      - specmatic-orchestrator-finished
+  workflow_dispatch:
 
 permissions:
   checks: write
