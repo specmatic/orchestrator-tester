@@ -41,7 +41,7 @@ jobs:
             -f head_sha="${GITHUB_SHA}" \
             -f status="in_progress" \
             -f details_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
-            -f output[title]="Orchestrator Gate" \
+            -f output[title]="Orchestrator Gate for run ${GITHUB_RUN_ID} attempt ${GITHUB_RUN_ATTEMPT}" \
             -f output[summary]="Waiting for orchestrator callback.")
           check_run_id=$(python3 -c 'import json,sys; print(json.loads(sys.stdin.read())["id"])' <<<"$response")
           check_run_url=$(python3 -c 'import json,sys; print(json.loads(sys.stdin.read())["html_url"])' <<<"$response")
@@ -49,11 +49,13 @@ jobs:
           echo "check_run_url=$check_run_url" >> "$GITHUB_OUTPUT"
           echo "Created pending check run: $check_run_url"
           {
-            echo "## Orchestrator Gate for enterprise run ${GITHUB_RUN_ID} (pending)"
+            echo "## Orchestrator Gate for enterprise run ${GITHUB_RUN_ID} attempt ${GITHUB_RUN_ATTEMPT} (pending)"
             echo ""
             echo "- Enterprise run id: ${GITHUB_RUN_ID}"
             echo "- Enterprise run attempt: ${GITHUB_RUN_ATTEMPT}"
+            echo "- Correlation key: ${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}"
             echo "- Pending check: [$check_run_id]($check_run_url)"
+            echo "- Check title: Orchestrator Gate for run ${GITHUB_RUN_ID} attempt ${GITHUB_RUN_ATTEMPT}"
             echo "- Status: in_progress"
           } >> "$GITHUB_STEP_SUMMARY"
 
