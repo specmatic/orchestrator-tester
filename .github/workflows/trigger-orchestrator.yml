@@ -24,39 +24,33 @@ jobs:
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
     permissions:
-      checks: write
+      statuses: write
       contents: write
     steps:
       - name: Checkout orchestrator-tester
         uses: actions/checkout@v5
 
-      - name: Create pending orchestrator check
-        id: pending-check
+      - name: Create pending orchestrator status
+        id: pending-status
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          response=$(gh api repos/${GITHUB_REPOSITORY}/check-runs -X POST \
-            -f name="Orchestrator Gate" \
-            -f head_sha="${GITHUB_SHA}" \
-            -f status="in_progress" \
-            -f details_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
-            -f output[title]="Orchestrator Gate for run ${GITHUB_RUN_ID} attempt ${GITHUB_RUN_ATTEMPT}" \
-            -f output[summary]="Waiting for orchestrator callback.")
-          check_run_id=$(python3 -c 'import json,sys; print(json.loads(sys.stdin.read())["id"])' <<<"$response")
-          check_run_url=$(python3 -c 'import json,sys; print(json.loads(sys.stdin.read())["html_url"])' <<<"$response")
-          echo "check_run_id=$check_run_id" >> "$GITHUB_OUTPUT"
-          echo "check_run_url=$check_run_url" >> "$GITHUB_OUTPUT"
-          echo "Created pending check run: $check_run_url"
+          status_context="Orchestrator Gate for run ${GITHUB_RUN_ID} attempt ${GITHUB_RUN_ATTEMPT}"
+          gh api repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA} -X POST             -f state="pending"             -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"             -f description="Waiting for orchestrator tests."             -f context="${status_context}"
+          status_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}"
+          echo "status_context=$status_context" >> "$GITHUB_OUTPUT"
+          echo "status_url=$status_url" >> "$GITHUB_OUTPUT"
+          echo "Created pending commit status: $status_url"
           {
             echo "## Orchestrator Gate for enterprise run ${GITHUB_RUN_ID} attempt ${GITHUB_RUN_ATTEMPT} (pending)"
             echo ""
             echo "- Enterprise run id: ${GITHUB_RUN_ID}"
             echo "- Enterprise run attempt: ${GITHUB_RUN_ATTEMPT}"
             echo "- Correlation key: ${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}"
-            echo "- Pending check: [$check_run_id]($check_run_url)"
-            echo "- Check title: Orchestrator Gate for run ${GITHUB_RUN_ID} attempt ${GITHUB_RUN_ATTEMPT}"
-            echo "- Status: in_progress"
+            echo "- Status context: ${status_context}"
+            echo "- Commit status: [${GITHUB_SHA:0:7}](${status_url})"
+            echo "- State: pending"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Set up Java
@@ -76,9 +70,7 @@ jobs:
           set -euo pipefail
           TAG="orchestrator-tester-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           JAR_PATH="build/orchestrator-tester.jar"
-          gh release create "$TAG" "$JAR_PATH" \
-            --title "orchestrator-tester ${GITHUB_RUN_ID}" \
-            --notes "Automated release for Specmatic orchestrator testing"
+          gh release create "$TAG" "$JAR_PATH"             --title "orchestrator-tester ${GITHUB_RUN_ID}"             --notes "Automated release for Specmatic orchestrator testing"
           JAR_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/orchestrator-tester.jar"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "jar_url=$JAR_URL" >> "$GITHUB_OUTPUT"
@@ -89,14 +81,14 @@ jobs:
           ORCHESTRATOR_REPOSITORY: ${{ inputs.orchestrator_repository }}
           ORCHESTRATOR_EVENT_TYPE: ${{ inputs.orchestrator_event_type }}
           ORCHESTRATOR_TEST_EXECUTOR_PATH: ${{ inputs.ORCHESTRATOR_TEST_EXECUTOR_PATH }}
-          ENTERPRISE_CHECK_RUN_ID: ${{ steps.pending-check.outputs.check_run_id }}
-          ENTERPRISE_CHECK_RUN_URL: ${{ steps.pending-check.outputs.check_run_url }}
+          ENTERPRISE_STATUS_CONTEXT: ${{ steps.pending-status.outputs.status_context }}
+          ENTERPRISE_STATUS_URL: ${{ steps.pending-status.outputs.status_url }}
           JAR_URL: ${{ steps.release.outputs.jar_url }}
         run: |
           set -euo pipefail
           if [ -z "${GH_TOKEN:-}" ]; then
             echo "Missing SPECMATIC_GITHUB_TOKEN repository secret."
-            echo "Add a fine-grained PAT or GitHub App token with access to specmatic/specmatic-tests-orchestrator."
+            echo "Add a fine-grained PAT or GitHub token with access to specmatic/specmatic-tests-orchestrator."
             exit 1
           fi
           python3 - <<'PY'
@@ -113,9 +105,9 @@ jobs:
                   "enterprise_run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
               },
           }
-          enterprise_check_run_id = os.environ.get("ENTERPRISE_CHECK_RUN_ID", "").strip()
-          if enterprise_check_run_id:
-              payload["client_payload"]["enterprise_check_run_id"] = enterprise_check_run_id
+          status_context = os.environ.get("ENTERPRISE_STATUS_CONTEXT", "").strip()
+          if status_context:
+              payload["client_payload"]["enterprise_status_context"] = status_context
           test_executor_path = os.environ.get("ORCHESTRATOR_TEST_EXECUTOR_PATH", "").strip()
           if test_executor_path:
               payload["client_payload"]["test_executor_path"] = test_executor_path
@@ -133,8 +125,8 @@ jobs:
             -f "client_payload[enterprise_run_id]=${GITHUB_RUN_ID}"
             -f "client_payload[enterprise_run_attempt]=${GITHUB_RUN_ATTEMPT}"
           )
-          if [ -n "${ENTERPRISE_CHECK_RUN_ID:-}" ]; then
-            args+=(-f "client_payload[enterprise_check_run_id]=${ENTERPRISE_CHECK_RUN_ID}")
+          if [ -n "${ENTERPRISE_STATUS_CONTEXT:-}" ]; then
+            args+=(-f "client_payload[enterprise_status_context]=${ENTERPRISE_STATUS_CONTEXT}")
           fi
           if [ -n "${ORCHESTRATOR_TEST_EXECUTOR_PATH:-}" ]; then
             args+=(-f "client_payload[test_executor_path]=${ORCHESTRATOR_TEST_EXECUTOR_PATH}")
