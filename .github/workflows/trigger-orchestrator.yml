@@ -26,6 +26,9 @@ on:
 jobs:
   build-and-trigger:
     runs-on: ubuntu-latest
+    outputs:
+      status_context: ${{ steps.pending-status.outputs.status_context }}
+      status_url: ${{ steps.pending-status.outputs.status_url }}
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
     permissions:
@@ -141,10 +144,18 @@ jobs:
           fi
           gh api "repos/${ORCHESTRATOR_REPOSITORY}/dispatches" -X POST "${args[@]}"
 
+  orchestrator-gate:
+    needs: build-and-trigger
+    runs-on: ubuntu-latest
+    permissions:
+      statuses: read
+      contents: read
+    steps:
       - name: Wait for orchestrator gate
         env:
           GH_TOKEN: ${{ github.token }}
-          STATUS_CONTEXT: ${{ steps.pending-status.outputs.status_context }}
+          STATUS_CONTEXT: ${{ needs.build-and-trigger.outputs.status_context }}
+          STATUS_URL: ${{ needs.build-and-trigger.outputs.status_url }}
           GATE_TIMEOUT_SECONDS: "3600"
         run: |
           set -euo pipefail
@@ -193,7 +204,7 @@ jobs:
           state = str(latest.get("state", "unknown"))
           description = str(latest.get("description") or "")
           target_url = str(latest.get("target_url") or "")
-          status_url = f"{os.environ['GITHUB_SERVER_URL']}/{repo}/commit/{sha}"
+          status_url = os.environ.get("STATUS_URL") or f"{os.environ['GITHUB_SERVER_URL']}/{repo}/commit/{sha}"
 
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
               summary.write("\n")

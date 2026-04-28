@@ -95,7 +95,8 @@ The workflow file in [`.github/workflows/trigger-orchestrator.yml`](./.github/wo
 - optionally forwarding `ORCHESTRATOR_TEST_EXECUTOR_PATH` when you want to test a specific manifest in the orchestrator repo
 - forwarding `ENTERPRISE_VERSION` so the orchestrator can resolve the Enterprise snapshot under test
 - dispatching `specmatic/specmatic-tests-orchestrator`
-- waiting for the original commit status context to move out of `pending`, then appending the final gate result to this workflow summary
+- showing a separate `orchestrator-gate` job while the original commit status context is `pending`
+- appending the final gate result and orchestrator run link to the `orchestrator-gate` job summary
 
 ## Test in GitHub Actions
 
@@ -108,6 +109,7 @@ The workflow file in [`.github/workflows/trigger-orchestrator.yml`](./.github/wo
    - `outputs/orchestration-summary.json`
    - `outputs/index.html`
    - the direct gate status update back to `specmatic/orchestrator-tester`
-6. Confirm the `Build and Trigger Orchestrator` summary contains a second gate section with the final state and orchestrator run link.
+6. Confirm the `orchestrator-gate` job is visible in the workflow graph while the orchestrator is running.
+7. Confirm the `orchestrator-gate` summary contains the final state and orchestrator run link.
 
 If the repository is private, use a signed or authenticated jar URL instead of a public release asset URL.
