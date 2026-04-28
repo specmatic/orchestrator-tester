@@ -17,6 +17,11 @@ on:
         description: Optional manifest path for orchestrator scenario testing
         required: false
         type: string
+      ENTERPRISE_VERSION:
+        description: Enterprise version to ask the orchestrator to test
+        required: false
+        default: 1.12.1-SNAPSHOT
+        type: string
 
 jobs:
   build-and-trigger:
@@ -81,6 +86,7 @@ jobs:
           ORCHESTRATOR_REPOSITORY: ${{ inputs.orchestrator_repository }}
           ORCHESTRATOR_EVENT_TYPE: ${{ inputs.orchestrator_event_type }}
           ORCHESTRATOR_TEST_EXECUTOR_PATH: ${{ inputs.ORCHESTRATOR_TEST_EXECUTOR_PATH }}
+          ENTERPRISE_VERSION: ${{ inputs.ENTERPRISE_VERSION }}
           ENTERPRISE_STATUS_CONTEXT: ${{ steps.pending-status.outputs.status_context }}
           ENTERPRISE_STATUS_URL: ${{ steps.pending-status.outputs.status_url }}
           JAR_URL: ${{ steps.release.outputs.jar_url }}
@@ -103,6 +109,7 @@ jobs:
                   "enterprise_sha": os.environ["GITHUB_SHA"],
                   "enterprise_run_id": os.environ["GITHUB_RUN_ID"],
                   "enterprise_run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
+                  "enterprise_version": os.environ["ENTERPRISE_VERSION"],
               },
           }
           status_context = os.environ.get("ENTERPRISE_STATUS_CONTEXT", "").strip()
@@ -124,6 +131,7 @@ jobs:
             -f "client_payload[enterprise_sha]=${GITHUB_SHA}"
             -f "client_payload[enterprise_run_id]=${GITHUB_RUN_ID}"
             -f "client_payload[enterprise_run_attempt]=${GITHUB_RUN_ATTEMPT}"
+            -f "client_payload[enterprise_version]=${ENTERPRISE_VERSION}"
           )
           if [ -n "${ENTERPRISE_STATUS_CONTEXT:-}" ]; then
             args+=(-f "client_payload[enterprise_status_context]=${ENTERPRISE_STATUS_CONTEXT}")

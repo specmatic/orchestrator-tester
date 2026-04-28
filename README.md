@@ -9,7 +9,7 @@ It is intentionally simple:
 2. Trigger the orchestrator with a fake `repository_dispatch` payload.
 3. Produce three sample test-source outputs from the side-project manifest.
 4. Consolidate them into `consolidated_output/summary.json` and `summary.html`.
-5. Send the callback back to the side project.
+5. Update the pending gate status in this side project.
 
 ## Structure
 
@@ -83,8 +83,9 @@ The intended production flow in a standalone `orchestrator-tester` repository is
    - `enterprise_sha`
    - `enterprise_run_id`
    - `enterprise_run_attempt`
+   - `enterprise_version`
    - optional `ORCHESTRATOR_TEST_EXECUTOR_PATH` if you want the orchestrator to use a non-default manifest
-4. Let the orchestrator run the sample test sources and call back.
+4. Let the orchestrator run the sample test sources and update the original pending status directly.
 
 The workflow file in [`.github/workflows/trigger-orchestrator.yml`](./.github/workflows/trigger-orchestrator.yml) now does this by:
 
@@ -92,6 +93,7 @@ The workflow file in [`.github/workflows/trigger-orchestrator.yml`](./.github/wo
 - creating a release asset for `orchestrator-tester.jar`
 - using the release asset download URL as `jar_url`
 - optionally forwarding `ORCHESTRATOR_TEST_EXECUTOR_PATH` when you want to test a specific manifest in the orchestrator repo
+- forwarding `ENTERPRISE_VERSION` so the orchestrator can resolve the Enterprise snapshot under test
 - dispatching `specmatic/specmatic-tests-orchestrator`
 
 ## Test in GitHub Actions
@@ -102,8 +104,8 @@ The workflow file in [`.github/workflows/trigger-orchestrator.yml`](./.github/wo
 4. Confirm the orchestrator workflow was dispatched.
 5. Confirm the orchestrator run produced:
    - `outputs/`
-   - `consolidated_output/summary.json`
-   - `consolidated_output/summary.html`
-   - the callback check run and repository dispatch back to `specmatic/orchestrator-tester`
+   - `outputs/orchestration-summary.json`
+   - `outputs/index.html`
+   - the direct gate status update back to `specmatic/orchestrator-tester`
 
 If the repository is private, use a signed or authenticated jar URL instead of a public release asset URL.
