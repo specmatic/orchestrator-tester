@@ -73,19 +73,26 @@ jobs:
           status = str(client_payload.get("status", "failure")).strip().lower()
           passed = status in {"success", "neutral"}
           result_banner = "PASS" if passed else "FAIL"
+          enterprise_run_id = md(client_payload.get("enterprise_run_id", ""))
+          enterprise_run_attempt = md(client_payload.get("enterprise_run_attempt", ""))
+          orchestrator_run_id = md(client_payload.get("orchestrator_run_id", ""))
+          orchestrator_run_attempt = md(client_payload.get("orchestrator_run_attempt", ""))
+          run_label = enterprise_run_id or "unknown"
 
           summary_lines = [
-              f"# {marker(passed)} Orchestrator callback: {result_banner}",
+              f"# {marker(passed)} Orchestrator callback for enterprise run {run_label}: {result_banner}",
               "",
-              "## Callback Overview",
+              f"## Callback Overview for enterprise run {run_label}",
               "",
               f"- Event: `{md(event_type)}`",
               f"- Status: `{md(status)}`",
               f"- Phase: `{md(client_payload.get('phase', ''))}`",
               f"- Enterprise repo: `{md(client_payload.get('enterprise_repository', ''))}`",
               f"- Enterprise SHA: `{md(client_payload.get('enterprise_sha', ''))}`",
-              f"- Enterprise run: `{md(client_payload.get('enterprise_run_id', ''))}` attempt `{md(client_payload.get('enterprise_run_attempt', ''))}`",
-              f"- Orchestrator run: `{md(client_payload.get('orchestrator_run_id', ''))}` attempt `{md(client_payload.get('orchestrator_run_attempt', ''))}`",
+              f"- Enterprise run id: `{enterprise_run_id}`",
+              f"- Enterprise run attempt: `{enterprise_run_attempt}`",
+              f"- Orchestrator run id: `{orchestrator_run_id}`",
+              f"- Orchestrator run attempt: `{orchestrator_run_attempt}`",
           ]
           if execution_error := first_value(report, ("execution_error",), default=client_payload.get("execution_error")):
               summary_lines.extend(["", "## Execution Error", "", "```text", str(execution_error), "```"])
@@ -199,7 +206,7 @@ jobs:
                   with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as handle:
                       handle.write("\n".join([
                           "",
-                          "## Completed Orchestrator Gate",
+                          f"## Completed Orchestrator Gate for enterprise run {run_label}",
                           "",
                           f"- Result: {marker(passed)} {result_banner}",
                           f"- Check: [Orchestrator Gate]({check_url})",
@@ -209,7 +216,7 @@ jobs:
               print("No pending Orchestrator Gate check found to finalize.")
 
           print(f"RESULT: {marker(passed)} {result_banner}")
-          print("Callback summary")
+          print(f"Callback summary for enterprise run {run_label}")
           print(f"  event_type: {event_type}")
           print(f"  status: {status}")
           print(f"  phase: {client_payload.get('phase', '')}")

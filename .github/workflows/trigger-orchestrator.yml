@@ -49,8 +49,10 @@ jobs:
           echo "check_run_url=$check_run_url" >> "$GITHUB_OUTPUT"
           echo "Created pending check run: $check_run_url"
           {
-            echo "## Orchestrator Gate"
+            echo "## Orchestrator Gate for enterprise run ${GITHUB_RUN_ID} (pending)"
             echo ""
+            echo "- Enterprise run id: ${GITHUB_RUN_ID}"
+            echo "- Enterprise run attempt: ${GITHUB_RUN_ATTEMPT}"
             echo "- Pending check: [$check_run_id]($check_run_url)"
             echo "- Status: in_progress"
           } >> "$GITHUB_STEP_SUMMARY"
