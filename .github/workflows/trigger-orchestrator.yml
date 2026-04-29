@@ -44,12 +44,45 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          status_context="Orchestrator Gate for run ${GITHUB_RUN_ID} attempt ${GITHUB_RUN_ATTEMPT}"
+          status_context="Specmatic Orchestrator Gate"
           gh api repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA} -X POST             -f state="pending"             -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"             -f description="Waiting for orchestrator tests."             -f context="${status_context}"
           status_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}"
           echo "status_context=$status_context" >> "$GITHUB_OUTPUT"
           echo "status_url=$status_url" >> "$GITHUB_OUTPUT"
           echo "Created pending commit status: $status_url"
+          python3 - <<'PY'
+          import json
+          import os
+          import subprocess
+
+          repo = os.environ["GITHUB_REPOSITORY"]
+          sha = os.environ["GITHUB_SHA"]
+          run_url = f"{os.environ['GITHUB_SERVER_URL']}/{repo}/actions/runs/{os.environ['GITHUB_RUN_ID']}"
+          raw = subprocess.check_output(["gh", "api", f"repos/{repo}/commits/{sha}/status"], text=True)
+          contexts = {
+              status.get("context")
+              for status in json.loads(raw).get("statuses", [])
+              if str(status.get("context", "")).startswith("Orchestrator Gate for run ")
+          }
+          for context in sorted(contexts):
+              subprocess.check_call(
+                  [
+                      "gh",
+                      "api",
+                      f"repos/{repo}/statuses/{sha}",
+                      "-X",
+                      "POST",
+                      "-f",
+                      "state=success",
+                      "-f",
+                      f"target_url={run_url}",
+                      "-f",
+                      "description=Superseded by Specmatic Orchestrator Gate.",
+                      "-f",
+                      f"context={context}",
+                  ]
+              )
+          PY
           {
             echo "## Orchestrator Gate for enterprise run ${GITHUB_RUN_ID} attempt ${GITHUB_RUN_ATTEMPT} (pending)"
             echo ""

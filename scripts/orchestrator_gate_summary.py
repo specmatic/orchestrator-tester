@@ -124,7 +124,7 @@ def render_summary_table(summary: dict[str, Any]) -> str:
     return "\n".join(body)
 
 
-def download_orchestration_summary(orchestrator_run_url: str) -> dict[str, Any] | None:
+def find_orchestration_summary(orchestrator_run_url: str) -> dict[str, Any] | None:
     parsed = parse_actions_run_url(orchestrator_run_url)
     if parsed is None:
         return None
@@ -151,6 +151,17 @@ def download_orchestration_summary(orchestrator_run_url: str) -> dict[str, Any] 
         if not summary_path.exists():
             return None
         return json.loads(summary_path.read_text(encoding="utf-8"))
+
+
+def wait_for_orchestration_summary(orchestrator_run_url: str, timeout_seconds: int = 180, poll_seconds: int = 10) -> dict[str, Any] | None:
+    started = time.time()
+    while time.time() - started < timeout_seconds:
+        summary = find_orchestration_summary(orchestrator_run_url)
+        if summary is not None:
+            return summary
+        print("Waiting for orchestrator artifact summary...")
+        time.sleep(poll_seconds)
+    return None
 
 
 def latest_status(repo: str, sha: str, context: str) -> dict[str, Any] | None:
@@ -193,7 +204,7 @@ def main() -> int:
     description = str(latest.get("description") or "")
     target_url = str(latest.get("target_url") or "")
     status_url = os.environ.get("STATUS_URL") or f"{os.environ['GITHUB_SERVER_URL']}/{repo}/commit/{sha}"
-    summary = download_orchestration_summary(target_url) if target_url else None
+    summary = wait_for_orchestration_summary(target_url) if target_url else None
 
     with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as handle:
         handle.write("\n")
