@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -28,6 +29,20 @@ def parse_actions_run_url(url: str) -> tuple[str, str, str] | None:
     if len(parts) < 5 or parts[2] != "actions" or parts[3] != "runs":
         return None
     return parts[0], parts[1], parts[4]
+
+
+def orchestrator_run_url_from_status(status: dict[str, Any], default_repository: str) -> str:
+    target_url = str(status.get("target_url") or "")
+    if parse_actions_run_url(target_url):
+        owner, repo, _ = parse_actions_run_url(target_url) or ("", "", "")
+        if f"{owner}/{repo}" == default_repository:
+            return target_url
+
+    description = str(status.get("description") or "")
+    match = re.search(r"Orchestrator run (\d+)", description)
+    if match:
+        return f"https://github.com/{default_repository}/actions/runs/{match.group(1)}"
+    return target_url
 
 
 def as_int(value: Any) -> int | None:
@@ -203,8 +218,10 @@ def main() -> int:
     state = str(latest.get("state", "unknown"))
     description = str(latest.get("description") or "")
     target_url = str(latest.get("target_url") or "")
+    orchestrator_repository = os.environ.get("ORCHESTRATOR_REPOSITORY", "specmatic/specmatic-tests-orchestrator")
+    orchestrator_run_url = orchestrator_run_url_from_status(latest, orchestrator_repository)
     status_url = os.environ.get("STATUS_URL") or f"{os.environ['GITHUB_SERVER_URL']}/{repo}/commit/{sha}"
-    summary = wait_for_orchestration_summary(target_url) if target_url else None
+    summary = wait_for_orchestration_summary(orchestrator_run_url) if orchestrator_run_url else None
 
     with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as handle:
         handle.write("\n")
@@ -215,12 +232,14 @@ def main() -> int:
             handle.write(f"- Description: {description}\n")
         handle.write(f"- Commit status: [{sha[:7]}]({status_url})\n")
         if target_url:
-            handle.write(f"- Orchestrator run: {target_url}\n")
+            handle.write(f"- Status details: {target_url}\n")
+        if orchestrator_run_url and orchestrator_run_url != target_url:
+            handle.write(f"- Orchestrator run: {orchestrator_run_url}\n")
         if summary is not None:
             handle.write("\n")
             handle.write(render_summary_table(summary))
             handle.write("\n")
-        elif target_url:
+        elif orchestrator_run_url:
             handle.write("\nCould not find `outputs/orchestration-summary.json` in the orchestrator artifact.\n")
 
     return 0 if state == "success" else 1

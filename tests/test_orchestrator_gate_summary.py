@@ -23,6 +23,34 @@ class OrchestratorGateSummaryTest(unittest.TestCase):
 
         self.assertEqual(parsed, ("specmatic", "specmatic-tests-orchestrator", "25054623103"))
 
+    def test_orchestrator_run_url_from_status_prefers_description_when_details_points_to_tester(self) -> None:
+        url = orchestrator_gate_summary.orchestrator_run_url_from_status(
+            {
+                "target_url": "https://github.com/specmatic/orchestrator-tester/actions/runs/25096082367",
+                "description": "Orchestrator run 25096088116 failed",
+            },
+            "specmatic/specmatic-tests-orchestrator",
+        )
+
+        self.assertEqual(
+            url,
+            "https://github.com/specmatic/specmatic-tests-orchestrator/actions/runs/25096088116",
+        )
+
+    def test_orchestrator_run_url_from_status_uses_target_when_it_is_orchestrator_run(self) -> None:
+        url = orchestrator_gate_summary.orchestrator_run_url_from_status(
+            {
+                "target_url": "https://github.com/specmatic/specmatic-tests-orchestrator/actions/runs/25096088116",
+                "description": "Orchestrator run 25096088116 failed",
+            },
+            "specmatic/specmatic-tests-orchestrator",
+        )
+
+        self.assertEqual(
+            url,
+            "https://github.com/specmatic/specmatic-tests-orchestrator/actions/runs/25096088116",
+        )
+
     def test_render_summary_table_uses_root_counts_and_workflow_rows(self) -> None:
         summary = {
             "conclusion": "failure",

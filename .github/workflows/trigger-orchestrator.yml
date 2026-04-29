@@ -103,6 +103,7 @@ jobs:
           ENTERPRISE_VERSION: ${{ inputs.ENTERPRISE_VERSION }}
           ENTERPRISE_STATUS_CONTEXT: ${{ steps.pending-status.outputs.status_context }}
           ENTERPRISE_STATUS_URL: ${{ steps.pending-status.outputs.status_url }}
+          ENTERPRISE_STATUS_TARGET_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           DEFAULT_DUMMY_JAR_URL: https://repo1.maven.org/maven2/junit/junit/4.13.2/junit-4.13.2.jar
           DEFAULT_DUMMY_ENTERPRISE_VERSION: 0.0.0-DUMMY
           DEFAULT_TEST_EXECUTOR_PATH: resources/orchestrator-tester-test-executor.json
@@ -142,6 +143,9 @@ jobs:
           status_context = os.environ.get("ENTERPRISE_STATUS_CONTEXT", "").strip()
           if status_context:
               payload["client_payload"]["enterprise_status_context"] = status_context
+          status_target_url = os.environ.get("ENTERPRISE_STATUS_TARGET_URL", "").strip()
+          if status_target_url:
+              payload["client_payload"]["enterprise_status_target_url"] = status_target_url
           if test_executor_path:
               payload["client_payload"]["test_executor_path"] = test_executor_path
           print("Repository dispatch payload:")
@@ -178,6 +182,9 @@ jobs:
           if [ -n "${ENTERPRISE_STATUS_CONTEXT:-}" ]; then
             args+=(-f "client_payload[enterprise_status_context]=${ENTERPRISE_STATUS_CONTEXT}")
           fi
+          if [ -n "${ENTERPRISE_STATUS_TARGET_URL:-}" ]; then
+            args+=(-f "client_payload[enterprise_status_target_url]=${ENTERPRISE_STATUS_TARGET_URL}")
+          fi
           if [ -n "${test_executor_path}" ]; then
             args+=(-f "client_payload[test_executor_path]=${test_executor_path}")
           fi
@@ -198,6 +205,7 @@ jobs:
           GH_TOKEN: ${{ secrets.SPECMATIC_GITHUB_TOKEN || github.token }}
           STATUS_CONTEXT: ${{ needs.build-and-trigger.outputs.status_context }}
           STATUS_URL: ${{ needs.build-and-trigger.outputs.status_url }}
+          ORCHESTRATOR_REPOSITORY: ${{ inputs.orchestrator_repository }}
           GATE_TIMEOUT_SECONDS: "3600"
         run: |
           set -euo pipefail
