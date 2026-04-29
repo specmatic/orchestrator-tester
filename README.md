@@ -5,11 +5,10 @@ Specmatic orchestrator flow end-to-end.
 
 It is intentionally simple:
 
-1. Build a tiny jar.
-2. Trigger the orchestrator with a fake `repository_dispatch` payload.
-3. Produce three sample test-source outputs from the side-project manifest.
-4. Consolidate them into `consolidated_output/summary.json` and `summary.html`.
-5. Update the pending gate status in this side project.
+1. Trigger the orchestrator with a fake `repository_dispatch` payload.
+2. Use a small public dummy jar by default for GitHub workflow tests.
+3. Produce three sample test-source outputs from a synthetic orchestrator manifest.
+4. Update the pending gate status in this side project.
 
 ## Structure
 
@@ -73,27 +72,26 @@ You can change `passed`, `passed_count`, `failed_count`, or `total` to simulate 
 
 ## Production workflow shape
 
-The intended production flow in a standalone `orchestrator-tester` repository is:
+The intended tester flow in GitHub Actions is:
 
-1. Build the jar.
-2. Upload the jar to a reachable URL.
-3. Dispatch `specmatic/specmatic-tests-orchestrator` with:
-   - `jar_url`
+1. Create a pending gate commit status.
+2. Dispatch `specmatic/specmatic-tests-orchestrator` with:
+   - a dummy `jar_url` by default: `https://repo1.maven.org/maven2/junit/junit/4.13.2/junit-4.13.2.jar`
+   - `enterprise_version=0.0.0-DUMMY` by default
+   - `test_executor_path=resources/orchestrator-tester-test-executor.json` by default
    - `enterprise_repository=specmatic/orchestrator-tester`
    - `enterprise_sha`
    - `enterprise_run_id`
    - `enterprise_run_attempt`
-   - `enterprise_version`
-   - optional `ORCHESTRATOR_TEST_EXECUTOR_PATH` if you want the orchestrator to use a non-default manifest
-4. Let the orchestrator run the sample test sources and update the original pending status directly.
+3. Let the orchestrator publish `outputs/orchestration-summary.json` and update the original pending status directly.
+
+To test a real Enterprise artifact, provide `ENTERPRISE_VERSION` when manually running the workflow. Supported values include `1.12.1-SNAPSHOT`, `SNAPSHOT`, `RELEASE`, a Specmatic Enterprise repository URL, or a direct Enterprise jar URL. When `ENTERPRISE_VERSION` is provided, the tester does not send the dummy jar URL; the orchestrator resolves the jar from the selector. Leave `ORCHESTRATOR_TEST_EXECUTOR_PATH` blank in that case to use the orchestrator's default real sample-project manifest, or provide a path to test another manifest.
 
 The workflow file in [`.github/workflows/trigger-orchestrator.yml`](./.github/workflows/trigger-orchestrator.yml) now does this by:
 
-- building the jar
-- creating a release asset for `orchestrator-tester.jar`
-- using the release asset download URL as `jar_url`
+- using the small public dummy jar and synthetic manifest when `ENTERPRISE_VERSION` is blank
+- forwarding `ENTERPRISE_VERSION` without the dummy jar when you want the orchestrator to resolve a real Enterprise artifact
 - optionally forwarding `ORCHESTRATOR_TEST_EXECUTOR_PATH` when you want to test a specific manifest in the orchestrator repo
-- forwarding `ENTERPRISE_VERSION` so the orchestrator can resolve the Enterprise snapshot under test
 - dispatching `specmatic/specmatic-tests-orchestrator`
 - showing a separate `orchestrator-gate` job while the stable `Specmatic Orchestrator Gate` commit status is `pending`
 - downloading the orchestrator `specmatic-outputs` artifact and appending `outputs/orchestration-summary.json` results to the `orchestrator-gate` job summary
@@ -102,14 +100,11 @@ The workflow file in [`.github/workflows/trigger-orchestrator.yml`](./.github/wo
 
 1. Push this repository to GitHub.
 2. Run the workflow named `Build and Trigger Orchestrator`.
-3. Confirm a release asset was created for `orchestrator-tester.jar`.
-4. Confirm the orchestrator workflow was dispatched.
-5. Confirm the orchestrator run produced:
+3. Confirm the orchestrator workflow was dispatched with the default dummy jar and synthetic manifest.
+4. Confirm the orchestrator run produced:
    - `outputs/`
    - `outputs/orchestration-summary.json`
    - `outputs/index.html`
    - the direct gate status update back to `specmatic/orchestrator-tester`
-6. Confirm the `orchestrator-gate` job is visible in the workflow graph while the orchestrator is running.
-7. Confirm the `orchestrator-gate` summary contains the final state, orchestrator run link, and orchestration result counts.
-
-If the repository is private, use a signed or authenticated jar URL instead of a public release asset URL.
+5. Confirm the `orchestrator-gate` job is visible in the workflow graph while the orchestrator is running.
+6. Confirm the `orchestrator-gate` summary contains the final state, orchestrator run link, and orchestration result counts.
