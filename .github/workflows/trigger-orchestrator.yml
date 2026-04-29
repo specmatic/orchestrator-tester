@@ -151,72 +151,15 @@ jobs:
       statuses: read
       contents: read
     steps:
+      - name: Checkout orchestrator-tester
+        uses: actions/checkout@v5
+
       - name: Wait for orchestrator gate
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.SPECMATIC_GITHUB_TOKEN || github.token }}
           STATUS_CONTEXT: ${{ needs.build-and-trigger.outputs.status_context }}
           STATUS_URL: ${{ needs.build-and-trigger.outputs.status_url }}
           GATE_TIMEOUT_SECONDS: "3600"
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          import json
-          import os
-          import subprocess
-          import sys
-          import time
-
-          repo = os.environ["GITHUB_REPOSITORY"]
-          sha = os.environ["GITHUB_SHA"]
-          context = os.environ["STATUS_CONTEXT"]
-          timeout_seconds = int(os.environ.get("GATE_TIMEOUT_SECONDS", "3600"))
-          poll_seconds = 15
-          started = time.time()
-          latest = {}
-
-          while time.time() - started < timeout_seconds:
-              raw = subprocess.check_output(
-                  ["gh", "api", f"repos/{repo}/commits/{sha}/status"],
-                  text=True,
-              )
-              combined = json.loads(raw)
-              matches = [
-                  status
-                  for status in combined.get("statuses", [])
-                  if status.get("context") == context
-              ]
-              if matches:
-                  latest = matches[0]
-                  state = str(latest.get("state", "pending"))
-                  print(f"Current orchestrator gate state: {state}")
-                  if state != "pending":
-                      break
-              else:
-                  print(f"Waiting for status context: {context}")
-              time.sleep(poll_seconds)
-          else:
-              latest = {
-                  "state": "timeout",
-                  "description": f"Timed out waiting for {context}",
-                  "target_url": "",
-              }
-
-          state = str(latest.get("state", "unknown"))
-          description = str(latest.get("description") or "")
-          target_url = str(latest.get("target_url") or "")
-          status_url = os.environ.get("STATUS_URL") or f"{os.environ['GITHUB_SERVER_URL']}/{repo}/commit/{sha}"
-
-          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
-              summary.write("\n")
-              summary.write(f"## Orchestrator Gate for enterprise run {os.environ['GITHUB_RUN_ID']} attempt {os.environ['GITHUB_RUN_ATTEMPT']} ({state})\n\n")
-              summary.write(f"- Status context: `{context}`\n")
-              summary.write(f"- State: `{state}`\n")
-              if description:
-                  summary.write(f"- Description: {description}\n")
-              summary.write(f"- Commit status: [{sha[:7]}]({status_url})\n")
-              if target_url:
-                  summary.write(f"- Orchestrator run: {target_url}\n")
-
-          if state != "success":
-              sys.exit(1)
-          PY
+          python3 scripts/orchestrator_gate_summary.py
