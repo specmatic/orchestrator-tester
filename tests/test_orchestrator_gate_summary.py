@@ -122,6 +122,32 @@ class OrchestratorGateSummaryTest(unittest.TestCase):
         self.assertEqual(summary, {"conclusion": "failure", "total": 2})
         self.assertEqual(calls["count"], 3)
 
+    def test_wait_for_orchestration_summary_retries_transient_read_errors(self) -> None:
+        calls = {"count": 0}
+        original_find = orchestrator_gate_summary.find_orchestration_summary
+        original_sleep = orchestrator_gate_summary.time.sleep
+        try:
+            def fake_find(url: str):
+                calls["count"] += 1
+                if calls["count"] == 1:
+                    raise RuntimeError("api temporarily unavailable")
+                return {"conclusion": "success", "total": 1}
+
+            orchestrator_gate_summary.find_orchestration_summary = fake_find
+            orchestrator_gate_summary.time.sleep = lambda seconds: None
+
+            summary = orchestrator_gate_summary.wait_for_orchestration_summary(
+                "https://github.com/specmatic/specmatic-tests-orchestrator/actions/runs/1",
+                timeout_seconds=30,
+                poll_seconds=1,
+            )
+        finally:
+            orchestrator_gate_summary.find_orchestration_summary = original_find
+            orchestrator_gate_summary.time.sleep = original_sleep
+
+        self.assertEqual(summary, {"conclusion": "success", "total": 1})
+        self.assertEqual(calls["count"], 2)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -15,8 +15,22 @@ from typing import Any
 from urllib.parse import urlparse
 
 
-def run_gh_api(path: str) -> dict[str, Any] | bytes:
-    return subprocess.check_output(["gh", "api", path])
+def run_gh_api(path: str, attempts: int = 5, delay_seconds: int = 5) -> bytes:
+    last_error = ""
+    for attempt in range(1, attempts + 1):
+        completed = subprocess.run(
+            ["gh", "api", path],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        if completed.returncode == 0:
+            return completed.stdout
+        last_error = completed.stderr.decode("utf-8", errors="replace").strip()
+        print(f"gh api failed for {path} (attempt {attempt}/{attempts}): {last_error}", flush=True)
+        if attempt < attempts:
+            time.sleep(delay_seconds)
+    raise RuntimeError(f"gh api failed for {path}: {last_error}")
 
 
 def load_json_from_gh(path: str) -> dict[str, Any]:
@@ -171,7 +185,11 @@ def find_orchestration_summary(orchestrator_run_url: str) -> dict[str, Any] | No
 def wait_for_orchestration_summary(orchestrator_run_url: str, timeout_seconds: int = 180, poll_seconds: int = 10) -> dict[str, Any] | None:
     started = time.time()
     while time.time() - started < timeout_seconds:
-        summary = find_orchestration_summary(orchestrator_run_url)
+        try:
+            summary = find_orchestration_summary(orchestrator_run_url)
+        except (OSError, RuntimeError, subprocess.SubprocessError, zipfile.BadZipFile, json.JSONDecodeError) as exc:
+            print(f"Could not read orchestrator artifact summary yet: {exc}", flush=True)
+            summary = None
         if summary is not None:
             return summary
         print("Waiting for orchestrator artifact summary...")
@@ -199,7 +217,11 @@ def main() -> int:
     latest: dict[str, Any] | None = None
 
     while time.time() - started < timeout_seconds:
-        latest = latest_status(repo, sha, context)
+        try:
+            latest = latest_status(repo, sha, context)
+        except (RuntimeError, json.JSONDecodeError) as exc:
+            print(f"Could not read commit status yet: {exc}", flush=True)
+            latest = None
         if latest:
             state = str(latest.get("state", "pending"))
             print(f"Current orchestrator gate state: {state}")
