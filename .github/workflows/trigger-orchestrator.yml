@@ -14,13 +14,13 @@ on:
         default: specmatic-enterprise-jar-ready
         type: string
       ORCHESTRATOR_TEST_EXECUTOR_PATH:
-        description: Optional manifest path. Defaults to a synthetic tester manifest unless ENTERPRISE_VERSION is provided.
+        description: Optional manifest path. Defaults to a synthetic tester manifest for 0.0.0-DUMMY.
         required: false
         type: string
       ENTERPRISE_VERSION:
-        description: Optional Enterprise selector. Leave blank to use the default dummy jar tester flow.
+        description: Enterprise selector. Use 0.0.0-DUMMY for the default dummy jar tester flow.
         required: false
-        default: ""
+        default: 0.0.0-DUMMY
         type: string
 
 jobs:
@@ -123,8 +123,9 @@ jobs:
           jar_url = ""
           enterprise_version = enterprise_selector
           if not enterprise_selector:
+              raise SystemExit("ENTERPRISE_VERSION is required. Use 0.0.0-DUMMY for the default tester flow.")
+          if enterprise_selector == os.environ["DEFAULT_DUMMY_ENTERPRISE_VERSION"]:
               jar_url = os.environ["DEFAULT_DUMMY_JAR_URL"]
-              enterprise_version = os.environ["DEFAULT_DUMMY_ENTERPRISE_VERSION"]
               if not test_executor_path:
                   test_executor_path = os.environ["DEFAULT_TEST_EXECUTOR_PATH"]
 
@@ -156,8 +157,11 @@ jobs:
           jar_url=""
           enterprise_version="${enterprise_selector}"
           if [ -z "${enterprise_selector}" ]; then
+            echo "ENTERPRISE_VERSION is required. Use ${DEFAULT_DUMMY_ENTERPRISE_VERSION} for the default tester flow."
+            exit 1
+          fi
+          if [ "${enterprise_selector}" = "${DEFAULT_DUMMY_ENTERPRISE_VERSION}" ]; then
             jar_url="${DEFAULT_DUMMY_JAR_URL}"
-            enterprise_version="${DEFAULT_DUMMY_ENTERPRISE_VERSION}"
             if [ -z "${test_executor_path}" ]; then
               test_executor_path="${DEFAULT_TEST_EXECUTOR_PATH}"
             fi
