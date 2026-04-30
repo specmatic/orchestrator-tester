@@ -53,7 +53,11 @@ jobs:
           set -euo pipefail
           status_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}"
           for configuration in ubuntu-latest windows-latest; do
-            status_context="Specmatic Orchestrator Gate (${configuration})"
+            if [ "${configuration}" = "ubuntu-latest" ]; then
+              status_context="Ubuntu - Specmatic Orchestrator Gate"
+            else
+              status_context="Windows - Specmatic Orchestrator Gate"
+            fi
             gh api repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA} -X POST             -f state="pending"             -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"             -f description="Waiting for orchestrator tests for ${configuration}."             -f context="${status_context}"
             echo "Created pending commit status for ${configuration}: ${status_url}"
           done
@@ -97,8 +101,8 @@ jobs:
             echo "- Enterprise run attempt: ${GITHUB_RUN_ATTEMPT}"
             echo "- Correlation key: ${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}"
             echo "- Commit status: [${GITHUB_SHA:0:7}](${status_url})"
-            echo "- Ubuntu context: Specmatic Orchestrator Gate (ubuntu-latest)"
-            echo "- Windows context: Specmatic Orchestrator Gate (windows-latest)"
+            echo "- Ubuntu context: Ubuntu - Specmatic Orchestrator Gate"
+            echo "- Windows context: Windows - Specmatic Orchestrator Gate"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Trigger orchestrator
@@ -136,6 +140,11 @@ jobs:
                   test_executor_path = os.environ["DEFAULT_TEST_EXECUTOR_PATH"]
 
           for configuration in ("ubuntu-latest", "windows-latest"):
+              status_context = (
+                  "Ubuntu - Specmatic Orchestrator Gate"
+                  if configuration == "ubuntu-latest"
+                  else "Windows - Specmatic Orchestrator Gate"
+              )
               payload = {
                   "event_type": os.environ["ORCHESTRATOR_EVENT_TYPE"],
                   "client_payload": {
@@ -144,7 +153,7 @@ jobs:
                       "enterprise_run_id": os.environ["GITHUB_RUN_ID"],
                       "enterprise_run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
                       "enterprise_version": enterprise_version,
-                      "enterprise_status_context": f"Specmatic Orchestrator Gate ({configuration})",
+                      "enterprise_status_context": status_context,
                       "enterprise_status_target_url": os.environ["ENTERPRISE_STATUS_TARGET_URL"],
                       "enterprise_configuration": configuration,
                   },
@@ -178,7 +187,11 @@ jobs:
           fi
 
           for configuration in ubuntu-latest windows-latest; do
-            status_context="Specmatic Orchestrator Gate (${configuration})"
+            if [ "${configuration}" = "ubuntu-latest" ]; then
+              status_context="Ubuntu - Specmatic Orchestrator Gate"
+            else
+              status_context="Windows - Specmatic Orchestrator Gate"
+            fi
             args=(
               -f "event_type=${ORCHESTRATOR_EVENT_TYPE}"
               -f "client_payload[enterprise_repository]=${GITHUB_REPOSITORY}"
@@ -201,7 +214,7 @@ jobs:
           done
 
   orchestrator-gate-ubuntu:
-    name: Specmatic Orchestrator Gate (ubuntu-latest)
+    name: Ubuntu - Specmatic Orchestrator Gate
     needs: build-and-trigger
     runs-on: ubuntu-latest
     permissions:
@@ -214,7 +227,7 @@ jobs:
       - name: Wait for orchestrator gate
         env:
           GH_TOKEN: ${{ secrets.SPECMATIC_GITHUB_TOKEN || github.token }}
-          STATUS_CONTEXT: Specmatic Orchestrator Gate (ubuntu-latest)
+          STATUS_CONTEXT: Ubuntu - Specmatic Orchestrator Gate
           STATUS_URL: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
           ORCHESTRATOR_REPOSITORY: ${{ inputs.orchestrator_repository }}
           GATE_TIMEOUT_SECONDS: "3600"
@@ -224,7 +237,7 @@ jobs:
           python3 scripts/orchestrator_gate_summary.py
 
   orchestrator-gate-windows:
-    name: Specmatic Orchestrator Gate (windows-latest)
+    name: Windows - Specmatic Orchestrator Gate
     needs: build-and-trigger
     runs-on: windows-latest
     permissions:
@@ -238,7 +251,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.SPECMATIC_GITHUB_TOKEN || github.token }}
-          STATUS_CONTEXT: Specmatic Orchestrator Gate (windows-latest)
+          STATUS_CONTEXT: Windows - Specmatic Orchestrator Gate
           STATUS_URL: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
           ORCHESTRATOR_REPOSITORY: ${{ inputs.orchestrator_repository }}
           GATE_TIMEOUT_SECONDS: "3600"

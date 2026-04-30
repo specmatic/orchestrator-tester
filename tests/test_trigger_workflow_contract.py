@@ -31,8 +31,8 @@ class TriggerWorkflowContractTest(unittest.TestCase):
 
         self.assertIn("matrix:", workflow)
         self.assertIn("os: [ ubuntu-latest, windows-latest ]", workflow)
-        self.assertIn("Specmatic Orchestrator Gate (ubuntu-latest)", workflow)
-        self.assertIn("Specmatic Orchestrator Gate (windows-latest)", workflow)
+        self.assertIn("Ubuntu - Specmatic Orchestrator Gate", workflow)
+        self.assertIn("Windows - Specmatic Orchestrator Gate", workflow)
         self.assertIn("-f \"client_payload[enterprise_configuration]=${configuration}\"", workflow)
         self.assertIn("runs-on: windows-latest", workflow)
         self.assertNotIn("needs.build-and-trigger.outputs.status_context", workflow)
