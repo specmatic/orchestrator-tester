@@ -74,7 +74,7 @@ You can change `passed`, `passed_count`, `failed_count`, or `total` to simulate 
 
 The intended tester flow in GitHub Actions is:
 
-1. Create a pending gate commit status.
+1. Create pending OS-scoped gate commit statuses.
 2. Dispatch `specmatic/specmatic-tests-orchestrator` with:
    - a dummy `jar_url` by default: `https://repo1.maven.org/maven2/junit/junit/4.13.2/junit-4.13.2.jar`
    - `enterprise_version=0.0.0-DUMMY` by default
@@ -83,7 +83,7 @@ The intended tester flow in GitHub Actions is:
    - `enterprise_sha`
    - `enterprise_run_id`
    - `enterprise_run_attempt`
-3. Let the orchestrator publish `outputs/orchestration-summary.json` and update the original pending status directly.
+3. Let the orchestrator publish `outputs/orchestration-summary.json` and update the original pending statuses directly.
 
 `ENTERPRISE_VERSION` must not be blank. Use the default `0.0.0-DUMMY` value for the lightweight tester flow. To test a real Enterprise artifact, replace it with a supported selector such as `1.12.1-SNAPSHOT`, `SNAPSHOT`, `RELEASE`, a Specmatic Enterprise repository URL, or a direct Enterprise jar URL. When a real selector is provided, the tester does not send the dummy jar URL; the orchestrator resolves the jar from the selector. Leave `ORCHESTRATOR_TEST_EXECUTOR_PATH` blank in that case to use the orchestrator's default real sample-project manifest, or provide a path to test another manifest.
 
@@ -93,9 +93,9 @@ The workflow file in [`.github/workflows/trigger-orchestrator.yml`](./.github/wo
 - failing early when `ENTERPRISE_VERSION` is blank
 - forwarding `ENTERPRISE_VERSION` without the dummy jar when you want the orchestrator to resolve a real Enterprise artifact
 - optionally forwarding `ORCHESTRATOR_TEST_EXECUTOR_PATH` when you want to test a specific manifest in the orchestrator repo
-- dispatching `specmatic/specmatic-tests-orchestrator`
-- showing a separate `orchestrator-gate` job while the stable `Specmatic Orchestrator Gate` commit status is `pending`
-- downloading the orchestrator `specmatic-outputs` artifact and appending `outputs/orchestration-summary.json` results to the `orchestrator-gate` job summary
+- dispatching `specmatic/specmatic-tests-orchestrator` once for Ubuntu and once for Windows
+- relying on the orchestrator callback to update the OS-scoped gate statuses, including the Details link to the exact orchestrator run
+- writing a short trigger summary with the gate contexts and orchestrator workflow link
 
 ## Test in GitHub Actions
 
@@ -107,5 +107,5 @@ The workflow file in [`.github/workflows/trigger-orchestrator.yml`](./.github/wo
    - `outputs/orchestration-summary.json`
    - `outputs/index.html`
    - the direct gate status update back to `specmatic/orchestrator-tester`
-5. Confirm the `orchestrator-gate` job is visible in the workflow graph while the orchestrator is running.
-6. Confirm the `orchestrator-gate` summary contains the final state, orchestrator run link, and orchestration result counts.
+5. Confirm the commit status popover shows `Ubuntu - Specmatic Orchestrator Gate` and `Windows - Specmatic Orchestrator Gate`.
+6. Confirm each gate's Details link points to the exact orchestrator run after the callback completes.

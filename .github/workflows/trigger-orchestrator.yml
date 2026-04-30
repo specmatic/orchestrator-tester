@@ -103,6 +103,8 @@ jobs:
             echo "- Commit status: [${GITHUB_SHA:0:7}](${status_url})"
             echo "- Ubuntu context: Ubuntu - Specmatic Orchestrator Gate"
             echo "- Windows context: Windows - Specmatic Orchestrator Gate"
+            echo "- Orchestrator workflow: https://github.com/specmatic/specmatic-tests-orchestrator/actions/workflows/specmatic-enterprise-jar-tests.yml"
+            echo "- Result details: callbacks update each gate's Details link to the exact specmatic-tests-orchestrator run."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Trigger orchestrator
@@ -212,50 +214,3 @@ jobs:
             echo "Dispatching orchestrator for ${configuration}"
             gh api "repos/${ORCHESTRATOR_REPOSITORY}/dispatches" -X POST "${args[@]}"
           done
-
-  orchestrator-gate-ubuntu:
-    name: Ubuntu - Specmatic Orchestrator Gate
-    needs: build-and-trigger
-    runs-on: ubuntu-latest
-    permissions:
-      statuses: read
-      contents: read
-    steps:
-      - name: Checkout orchestrator-tester
-        uses: actions/checkout@v5
-
-      - name: Wait for orchestrator gate
-        env:
-          GH_TOKEN: ${{ secrets.SPECMATIC_GITHUB_TOKEN || github.token }}
-          STATUS_CONTEXT: Ubuntu - Specmatic Orchestrator Gate
-          STATUS_URL: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
-          ORCHESTRATOR_REPOSITORY: ${{ inputs.orchestrator_repository }}
-          GATE_TIMEOUT_SECONDS: "3600"
-          UPSTREAM_RESULT: ${{ needs.build-and-trigger.result }}
-        run: |
-          set -euo pipefail
-          python3 scripts/orchestrator_gate_summary.py
-
-  orchestrator-gate-windows:
-    name: Windows - Specmatic Orchestrator Gate
-    needs: build-and-trigger
-    runs-on: windows-latest
-    permissions:
-      statuses: read
-      contents: read
-    steps:
-      - name: Checkout orchestrator-tester
-        uses: actions/checkout@v5
-
-      - name: Wait for orchestrator gate
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.SPECMATIC_GITHUB_TOKEN || github.token }}
-          STATUS_CONTEXT: Windows - Specmatic Orchestrator Gate
-          STATUS_URL: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
-          ORCHESTRATOR_REPOSITORY: ${{ inputs.orchestrator_repository }}
-          GATE_TIMEOUT_SECONDS: "3600"
-          UPSTREAM_RESULT: ${{ needs.build-and-trigger.result }}
-        run: |
-          set -euo pipefail
-          python3 scripts/orchestrator_gate_summary.py

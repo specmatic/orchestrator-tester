@@ -34,8 +34,9 @@ class TriggerWorkflowContractTest(unittest.TestCase):
         self.assertIn("Ubuntu - Specmatic Orchestrator Gate", workflow)
         self.assertIn("Windows - Specmatic Orchestrator Gate", workflow)
         self.assertIn("-f \"client_payload[enterprise_configuration]=${configuration}\"", workflow)
-        self.assertIn("runs-on: windows-latest", workflow)
+        self.assertIn("callbacks update each gate's Details link", workflow)
         self.assertNotIn("needs.build-and-trigger.outputs.status_context", workflow)
+        self.assertNotIn("Wait for orchestrator gate", workflow)
 
 
 if __name__ == "__main__":
