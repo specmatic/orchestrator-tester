@@ -148,6 +148,10 @@ class OrchestratorGateSummaryTest(unittest.TestCase):
         self.assertEqual(summary, {"conclusion": "success", "total": 1})
         self.assertEqual(calls["count"], 2)
 
+    def test_missing_status_can_report_upstream_trigger_failure_without_waiting(self) -> None:
+        self.assertIn("UPSTREAM_RESULT", SCRIPT_PATH.read_text(encoding="utf-8"))
+        self.assertIn("orchestrator was not dispatched", SCRIPT_PATH.read_text(encoding="utf-8"))
+
 
 if __name__ == "__main__":
     unittest.main()

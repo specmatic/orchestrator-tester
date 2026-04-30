@@ -26,6 +26,17 @@ class TriggerWorkflowContractTest(unittest.TestCase):
             workflow,
         )
 
+    def test_workflow_replicates_enterprise_os_scoped_orchestrator_gates(self) -> None:
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+
+        self.assertIn("matrix:", workflow)
+        self.assertIn("os: [ ubuntu-latest, windows-latest ]", workflow)
+        self.assertIn("Specmatic Orchestrator Gate (ubuntu-latest)", workflow)
+        self.assertIn("Specmatic Orchestrator Gate (windows-latest)", workflow)
+        self.assertIn("-f \"client_payload[enterprise_configuration]=${configuration}\"", workflow)
+        self.assertIn("runs-on: windows-latest", workflow)
+        self.assertNotIn("needs.build-and-trigger.outputs.status_context", workflow)
+
 
 if __name__ == "__main__":
     unittest.main()

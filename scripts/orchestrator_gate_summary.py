@@ -213,6 +213,7 @@ def main() -> int:
     context = os.environ["STATUS_CONTEXT"]
     timeout_seconds = int(os.environ.get("GATE_TIMEOUT_SECONDS", "3600"))
     poll_seconds = int(os.environ.get("GATE_POLL_SECONDS", "15"))
+    upstream_result = os.environ.get("UPSTREAM_RESULT", "")
     started = time.time()
     latest: dict[str, Any] | None = None
 
@@ -228,6 +229,17 @@ def main() -> int:
             if state != "pending":
                 break
         else:
+            if upstream_result and upstream_result != "success":
+                print(
+                    f"Status context {context} was not found because upstream job result was {upstream_result}.",
+                    flush=True,
+                )
+                latest = {
+                    "state": "not_found",
+                    "description": f"Upstream build/trigger result was {upstream_result}; orchestrator was not dispatched.",
+                    "target_url": "",
+                }
+                break
             print(f"Waiting for status context: {context}")
         time.sleep(poll_seconds)
     else:
