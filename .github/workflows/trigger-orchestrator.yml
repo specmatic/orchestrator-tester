@@ -112,7 +112,7 @@ jobs:
           ENTERPRISE_STATUS_TARGET_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           DEFAULT_DUMMY_JAR_URL: https://repo1.maven.org/maven2/junit/junit/4.13.2/junit-4.13.2.jar
           DEFAULT_DUMMY_ENTERPRISE_VERSION: 0.0.0-DUMMY
-          DEFAULT_TEST_EXECUTOR_PATH: resources/orchestrator-tester-test-executor.json
+          DEFAULT_TEST_EXECUTOR_PATH: tests/resources/orchestrator-tester-test-executor.json
         run: |
           set -euo pipefail
           if [ -z "${GH_TOKEN:-}" ]; then

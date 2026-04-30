@@ -14,7 +14,7 @@ class TriggerWorkflowContractTest(unittest.TestCase):
         self.assertIn("default: 0.0.0-DUMMY", workflow)
         self.assertIn("DEFAULT_DUMMY_ENTERPRISE_VERSION: 0.0.0-DUMMY", workflow)
         self.assertIn("DEFAULT_DUMMY_JAR_URL: https://repo1.maven.org/maven2/junit/junit/4.13.2/junit-4.13.2.jar", workflow)
-        self.assertIn("DEFAULT_TEST_EXECUTOR_PATH: resources/orchestrator-tester-test-executor.json", workflow)
+        self.assertIn("DEFAULT_TEST_EXECUTOR_PATH: tests/resources/orchestrator-tester-test-executor.json", workflow)
 
     def test_blank_enterprise_version_fails_instead_of_defaulting_to_dummy_flow(self) -> None:
         workflow = WORKFLOW.read_text(encoding="utf-8")

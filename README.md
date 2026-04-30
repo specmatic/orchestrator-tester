@@ -78,7 +78,7 @@ The intended tester flow in GitHub Actions is:
 2. Dispatch `specmatic/specmatic-tests-orchestrator` with:
    - a dummy `jar_url` by default: `https://repo1.maven.org/maven2/junit/junit/4.13.2/junit-4.13.2.jar`
    - `enterprise_version=0.0.0-DUMMY` by default
-   - `test_executor_path=resources/orchestrator-tester-test-executor.json` by default
+   - `test_executor_path=tests/resources/orchestrator-tester-test-executor.json` by default
    - `enterprise_repository=specmatic/orchestrator-tester`
    - `enterprise_sha`
    - `enterprise_run_id`
