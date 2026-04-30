@@ -48,7 +48,7 @@ jobs:
       - name: Create pending orchestrator status
         if: github.event_name == 'workflow_dispatch' && matrix.os == 'ubuntu-latest'
         env:
-          GH_TOKEN: ${{ github.token }}
+          STATUS_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           status_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}"
@@ -58,7 +58,12 @@ jobs:
             else
               status_context="Windows - Specmatic Orchestrator Gate"
             fi
-            gh api repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA} -X POST             -f state="pending"             -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"             -f description="Waiting for orchestrator tests for ${configuration}."             -f context="${status_context}"
+            curl -sS -X POST \
+              -H "Authorization: Bearer ${STATUS_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+              -d '{"state":"pending","target_url":"'"${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"'","description":"Waiting for orchestrator tests for '"${configuration}"'.","context":"'"${status_context}"'"}'
             echo "Created pending commit status for ${configuration}: ${status_url}"
           done
           python3 - <<'PY'
@@ -68,8 +73,22 @@ jobs:
 
           repo = os.environ["GITHUB_REPOSITORY"]
           sha = os.environ["GITHUB_SHA"]
+          token = os.environ["STATUS_TOKEN"]
           run_url = f"{os.environ['GITHUB_SERVER_URL']}/{repo}/actions/runs/{os.environ['GITHUB_RUN_ID']}"
-          raw = subprocess.check_output(["gh", "api", f"repos/{repo}/commits/{sha}/status"], text=True)
+          raw = subprocess.check_output(
+              [
+                  "curl",
+                  "-sS",
+                  "-H",
+                  f"Authorization: Bearer {token}",
+                  "-H",
+                  "Accept: application/vnd.github+json",
+                  "-H",
+                  "X-GitHub-Api-Version: 2022-11-28",
+                  f"https://api.github.com/repos/{repo}/commits/{sha}/status",
+              ],
+              text=True,
+          )
           contexts = {
               status.get("context")
               for status in json.loads(raw).get("statuses", [])
@@ -78,19 +97,26 @@ jobs:
           for context in sorted(contexts):
               subprocess.check_call(
                   [
-                      "gh",
-                      "api",
-                      f"repos/{repo}/statuses/{sha}",
+                      "curl",
+                      "-sS",
                       "-X",
                       "POST",
-                      "-f",
-                      "state=success",
-                      "-f",
-                      f"target_url={run_url}",
-                      "-f",
-                      "description=Superseded by Specmatic Orchestrator Gate.",
-                      "-f",
-                      f"context={context}",
+                      "-H",
+                      f"Authorization: Bearer {token}",
+                      "-H",
+                      "Accept: application/vnd.github+json",
+                      "-H",
+                      "X-GitHub-Api-Version: 2022-11-28",
+                      f"https://api.github.com/repos/{repo}/statuses/{sha}",
+                      "-d",
+                      json.dumps(
+                          {
+                              "state": "success",
+                              "target_url": run_url,
+                              "description": "Superseded by Specmatic Orchestrator Gate.",
+                              "context": context,
+                          }
+                      ),
                   ]
               )
           PY

@@ -33,6 +33,8 @@ class TriggerWorkflowContractTest(unittest.TestCase):
         self.assertIn("os: [ ubuntu-latest, windows-latest ]", workflow)
         self.assertIn("Ubuntu - Specmatic Orchestrator Gate", workflow)
         self.assertIn("Windows - Specmatic Orchestrator Gate", workflow)
+        self.assertIn("https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}", workflow)
+        self.assertIn("Authorization: Bearer ${STATUS_TOKEN}", workflow)
         self.assertIn("-f \"client_payload[enterprise_configuration]=${configuration}\"", workflow)
         self.assertIn("callbacks update each gate's Details link", workflow)
         self.assertNotIn("needs.build-and-trigger.outputs.status_context", workflow)
