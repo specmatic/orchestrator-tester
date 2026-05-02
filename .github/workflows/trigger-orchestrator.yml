@@ -190,7 +190,9 @@ jobs:
                       "enterprise_status_context": status_context,
                       "enterprise_status_target_url": os.environ["ENTERPRISE_STATUS_TARGET_URL"],
                       "enterprise_configuration": configuration,
-                      "run_parallel": os.environ.get("RUN_PARALLEL", "false"),
+                      "orchestrator_options": {
+                          "run_parallel": os.environ.get("RUN_PARALLEL", "false"),
+                      },
                   },
               }
               if jar_url:
@@ -237,7 +239,7 @@ jobs:
               -f "client_payload[enterprise_status_context]=${status_context}"
               -f "client_payload[enterprise_status_target_url]=${ENTERPRISE_STATUS_TARGET_URL}"
               -f "client_payload[enterprise_configuration]=${configuration}"
-              -f "client_payload[run_parallel]=${RUN_PARALLEL}"
+              -f "client_payload[orchestrator_options][run_parallel]=${RUN_PARALLEL}"
             )
             if [ -n "${jar_url}" ]; then
               args+=(-f "client_payload[jar_url]=${jar_url}")
