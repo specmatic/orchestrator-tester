@@ -182,23 +182,25 @@ jobs:
               payload = {
                   "event_type": os.environ["ORCHESTRATOR_EVENT_TYPE"],
                   "client_payload": {
-                      "enterprise_repository": os.environ["GITHUB_REPOSITORY"],
-                      "enterprise_sha": os.environ["GITHUB_SHA"],
-                      "enterprise_run_id": os.environ["GITHUB_RUN_ID"],
-                      "enterprise_run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
-                      "enterprise_version": enterprise_version,
-                      "enterprise_status_context": status_context,
-                      "enterprise_status_target_url": os.environ["ENTERPRISE_STATUS_TARGET_URL"],
-                      "enterprise_configuration": configuration,
+                      "enterprise_options": {
+                          "repository": os.environ["GITHUB_REPOSITORY"],
+                          "sha": os.environ["GITHUB_SHA"],
+                          "run_id": os.environ["GITHUB_RUN_ID"],
+                          "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
+                          "version": enterprise_version,
+                          "status_context": status_context,
+                          "status_target_url": os.environ["ENTERPRISE_STATUS_TARGET_URL"],
+                          "configuration": configuration,
+                      },
                       "orchestrator_options": {
                           "run_parallel": os.environ.get("RUN_PARALLEL", "false"),
                       },
                   },
               }
               if jar_url:
-                  payload["client_payload"]["jar_url"] = jar_url
+                  payload["client_payload"]["orchestrator_options"]["jar_url"] = jar_url
               if test_executor_path:
-                  payload["client_payload"]["test_executor_path"] = test_executor_path
+                  payload["client_payload"]["orchestrator_options"]["test_executor_path"] = test_executor_path
               print(f"Repository dispatch payload for {configuration}:")
               print(json.dumps(payload, indent=2, sort_keys=True))
           PY
@@ -231,21 +233,21 @@ jobs:
             fi
             args=(
               -f "event_type=${ORCHESTRATOR_EVENT_TYPE}"
-              -f "client_payload[enterprise_repository]=${GITHUB_REPOSITORY}"
-              -f "client_payload[enterprise_sha]=${GITHUB_SHA}"
-              -f "client_payload[enterprise_run_id]=${GITHUB_RUN_ID}"
-              -f "client_payload[enterprise_run_attempt]=${GITHUB_RUN_ATTEMPT}"
-              -f "client_payload[enterprise_version]=${enterprise_version}"
-              -f "client_payload[enterprise_status_context]=${status_context}"
-              -f "client_payload[enterprise_status_target_url]=${ENTERPRISE_STATUS_TARGET_URL}"
-              -f "client_payload[enterprise_configuration]=${configuration}"
+              -f "client_payload[enterprise_options][repository]=${GITHUB_REPOSITORY}"
+              -f "client_payload[enterprise_options][sha]=${GITHUB_SHA}"
+              -f "client_payload[enterprise_options][run_id]=${GITHUB_RUN_ID}"
+              -f "client_payload[enterprise_options][run_attempt]=${GITHUB_RUN_ATTEMPT}"
+              -f "client_payload[enterprise_options][version]=${enterprise_version}"
+              -f "client_payload[enterprise_options][status_context]=${status_context}"
+              -f "client_payload[enterprise_options][status_target_url]=${ENTERPRISE_STATUS_TARGET_URL}"
+              -f "client_payload[enterprise_options][configuration]=${configuration}"
               -f "client_payload[orchestrator_options][run_parallel]=${RUN_PARALLEL}"
             )
             if [ -n "${jar_url}" ]; then
-              args+=(-f "client_payload[jar_url]=${jar_url}")
+              args+=(-f "client_payload[orchestrator_options][jar_url]=${jar_url}")
             fi
             if [ -n "${test_executor_path}" ]; then
-              args+=(-f "client_payload[test_executor_path]=${test_executor_path}")
+              args+=(-f "client_payload[orchestrator_options][test_executor_path]=${test_executor_path}")
             fi
             echo "Dispatching orchestrator for ${configuration}"
             gh api "repos/${ORCHESTRATOR_REPOSITORY}/dispatches" -X POST "${args[@]}"
