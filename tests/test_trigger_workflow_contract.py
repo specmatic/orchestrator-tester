@@ -15,6 +15,8 @@ class TriggerWorkflowContractTest(unittest.TestCase):
         self.assertIn("DEFAULT_DUMMY_ENTERPRISE_VERSION: 0.0.0-DUMMY", workflow)
         self.assertIn("DEFAULT_DUMMY_JAR_URL: https://repo1.maven.org/maven2/junit/junit/4.13.2/junit-4.13.2.jar", workflow)
         self.assertIn("DEFAULT_TEST_EXECUTOR_PATH: tests/resources/orchestrator-tester-test-executor.json", workflow)
+        self.assertIn("run_parallel:", workflow)
+        self.assertIn("RUN_PARALLEL: ${{ inputs.run_parallel }}", workflow)
 
     def test_blank_enterprise_version_fails_instead_of_defaulting_to_dummy_flow(self) -> None:
         workflow = WORKFLOW.read_text(encoding="utf-8")
@@ -36,6 +38,8 @@ class TriggerWorkflowContractTest(unittest.TestCase):
         self.assertIn("https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}", workflow)
         self.assertIn("Authorization: Bearer ${STATUS_TOKEN}", workflow)
         self.assertIn("-f \"client_payload[enterprise_configuration]=${configuration}\"", workflow)
+        self.assertIn("-f \"client_payload[run_parallel]=${RUN_PARALLEL}\"", workflow)
+        self.assertIn('"run_parallel": os.environ.get("RUN_PARALLEL", "false")', workflow)
         self.assertIn("callbacks update each gate's Details link", workflow)
         self.assertNotIn("needs.build-and-trigger.outputs.status_context", workflow)
         self.assertNotIn("Wait for orchestrator gate", workflow)

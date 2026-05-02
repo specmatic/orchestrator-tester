@@ -22,6 +22,11 @@ on:
         required: false
         default: 0.0.0-DUMMY
         type: string
+      run_parallel:
+        description: Run orchestrator tests by dispatching target repo workflows in parallel
+        required: false
+        default: true
+        type: boolean
 
 jobs:
   build-and-trigger:
@@ -141,10 +146,11 @@ jobs:
           ORCHESTRATOR_EVENT_TYPE: ${{ inputs.orchestrator_event_type }}
           ORCHESTRATOR_TEST_EXECUTOR_PATH: ${{ inputs.ORCHESTRATOR_TEST_EXECUTOR_PATH }}
           ENTERPRISE_VERSION: ${{ inputs.ENTERPRISE_VERSION }}
+          RUN_PARALLEL: ${{ inputs.run_parallel }}
           ENTERPRISE_STATUS_TARGET_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           DEFAULT_DUMMY_JAR_URL: https://repo1.maven.org/maven2/junit/junit/4.13.2/junit-4.13.2.jar
           DEFAULT_DUMMY_ENTERPRISE_VERSION: 0.0.0-DUMMY
-          DEFAULT_TEST_EXECUTOR_PATH: tests/resources/orchestrator-tester-test-executor.json
+          DEFAULT_TEST_EXECUTOR_PATH: tests/resources/test-executor-real.json
         run: |
           set -euo pipefail
           if [ -z "${GH_TOKEN:-}" ]; then
@@ -184,6 +190,7 @@ jobs:
                       "enterprise_status_context": status_context,
                       "enterprise_status_target_url": os.environ["ENTERPRISE_STATUS_TARGET_URL"],
                       "enterprise_configuration": configuration,
+                      "run_parallel": os.environ.get("RUN_PARALLEL", "false"),
                   },
               }
               if jar_url:
@@ -230,6 +237,7 @@ jobs:
               -f "client_payload[enterprise_status_context]=${status_context}"
               -f "client_payload[enterprise_status_target_url]=${ENTERPRISE_STATUS_TARGET_URL}"
               -f "client_payload[enterprise_configuration]=${configuration}"
+              -f "client_payload[run_parallel]=${RUN_PARALLEL}"
             )
             if [ -n "${jar_url}" ]; then
               args+=(-f "client_payload[jar_url]=${jar_url}")
