@@ -184,6 +184,8 @@ jobs:
                   "client_payload": {
                       "enterprise_options": {
                           "repository": os.environ["GITHUB_REPOSITORY"],
+                          "repository_name": os.environ["GITHUB_REPOSITORY"].split("/")[-1].capitalize(),
+                          "run_number": os.environ["GITHUB_RUN_NUMBER"],
                           "sha": os.environ["GITHUB_SHA"],
                           "run_id": os.environ["GITHUB_RUN_ID"],
                           "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
@@ -194,7 +196,6 @@ jobs:
                       },
                       "orchestrator_options": {
                           "run_parallel": os.environ.get("RUN_PARALLEL", "false"),
-                          "orchestrator_tester_run_number": os.environ["GITHUB_RUN_NUMBER"],
                       },
                   },
               }
@@ -225,6 +226,8 @@ jobs:
           if [ -n "${test_executor_path}" ]; then
             echo "Passing orchestrator manifest override: ${test_executor_path}"
           fi
+          repository_name="${GITHUB_REPOSITORY#*/}"
+          repository_label="${repository_name^}"
 
           for configuration in ubuntu-latest windows-latest; do
             if [ "${configuration}" = "ubuntu-latest" ]; then
@@ -235,6 +238,8 @@ jobs:
             args=(
               -f "event_type=${ORCHESTRATOR_EVENT_TYPE}"
               -f "client_payload[enterprise_options][repository]=${GITHUB_REPOSITORY}"
+              -f "client_payload[enterprise_options][repository_name]=${repository_label}"
+              -f "client_payload[enterprise_options][run_number]=${GITHUB_RUN_NUMBER}"
               -f "client_payload[enterprise_options][sha]=${GITHUB_SHA}"
               -f "client_payload[enterprise_options][run_id]=${GITHUB_RUN_ID}"
               -f "client_payload[enterprise_options][run_attempt]=${GITHUB_RUN_ATTEMPT}"
@@ -243,7 +248,6 @@ jobs:
               -f "client_payload[enterprise_options][status_target_url]=${ENTERPRISE_STATUS_TARGET_URL}"
               -f "client_payload[enterprise_options][configuration]=${configuration}"
               -f "client_payload[orchestrator_options][run_parallel]=${RUN_PARALLEL}"
-              -f "client_payload[orchestrator_options][orchestrator_tester_run_number]=${GITHUB_RUN_NUMBER}"
             )
             if [ -n "${jar_url}" ]; then
               args+=(-f "client_payload[orchestrator_options][jar_url]=${jar_url}")
