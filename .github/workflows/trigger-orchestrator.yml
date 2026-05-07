@@ -27,13 +27,16 @@ on:
         required: false
         default: true
         type: boolean
+      orchestrator_tester_run_number:
+        required: false
+        type: string
 
 jobs:
   build-and-trigger:
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-latest, windows-latest ]
+        os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
@@ -194,6 +197,7 @@ jobs:
                       },
                       "orchestrator_options": {
                           "run_parallel": os.environ.get("RUN_PARALLEL", "false"),
+                          "orchestrator_tester_run_number": os.environ["GITHUB_RUN_NUMBER"],
                       },
                   },
               }
@@ -242,6 +246,7 @@ jobs:
               -f "client_payload[enterprise_options][status_target_url]=${ENTERPRISE_STATUS_TARGET_URL}"
               -f "client_payload[enterprise_options][configuration]=${configuration}"
               -f "client_payload[orchestrator_options][run_parallel]=${RUN_PARALLEL}"
+              -f "client_payload[orchestrator_options][orchestrator_tester_run_number]=${GITHUB_RUN_NUMBER}"
             )
             if [ -n "${jar_url}" ]; then
               args+=(-f "client_payload[orchestrator_options][jar_url]=${jar_url}")
