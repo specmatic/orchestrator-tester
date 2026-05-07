@@ -27,9 +27,6 @@ on:
         required: false
         default: true
         type: boolean
-      orchestrator_tester_run_number:
-        required: false
-        type: string
 
 jobs:
   build-and-trigger:
