@@ -32,7 +32,7 @@ class TriggerWorkflowContractTest(unittest.TestCase):
         workflow = WORKFLOW.read_text(encoding="utf-8")
 
         self.assertIn("matrix:", workflow)
-        self.assertIn("os: [ ubuntu-latest, windows-latest ]", workflow)
+        self.assertIn("os: [ubuntu-latest, windows-latest]", workflow)
         self.assertIn("Ubuntu - Specmatic Orchestrator Gate", workflow)
         self.assertIn("Windows - Specmatic Orchestrator Gate", workflow)
         self.assertIn("https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}", workflow)
