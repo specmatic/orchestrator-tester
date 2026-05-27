@@ -13,21 +13,16 @@ on:
         required: false
         default: specmatic-enterprise-jar-ready
         type: string
-      ORCHESTRATOR_TEST_EXECUTOR_PATH:
-        description: Optional manifest path. Defaults to a synthetic tester manifest for 0.0.0-DUMMY.
+      TEST_EXECUTOR_JSON_PATH:
+        description: Path to the caller-owned test executor JSON file to embed in the orchestrator payload.
         required: false
+        default: resources/test-executor.json
         type: string
       ENTERPRISE_VERSION:
         description: Enterprise selector. Use 0.0.0-DUMMY for the default dummy jar tester flow.
         required: false
         default: 0.0.0-DUMMY
         type: string
-      run_parallel:
-        description: Run orchestrator tests by dispatching target repo workflows in parallel
-        required: false
-        default: true
-        type: boolean
-
 jobs:
   build-and-trigger:
     strategy:
@@ -141,91 +136,46 @@ jobs:
       - name: Trigger orchestrator
         if: github.event_name == 'workflow_dispatch' && matrix.os == 'ubuntu-latest'
         env:
-          GH_TOKEN: ${{ secrets.SPECMATIC_GITHUB_TOKEN }}
+          SPECMATIC_GITHUB_TOKEN: ${{ secrets.SPECMATIC_GITHUB_TOKEN }}
           ORCHESTRATOR_REPOSITORY: ${{ inputs.orchestrator_repository }}
           ORCHESTRATOR_EVENT_TYPE: ${{ inputs.orchestrator_event_type }}
-          ORCHESTRATOR_TEST_EXECUTOR_PATH: ${{ inputs.ORCHESTRATOR_TEST_EXECUTOR_PATH }}
+          TEST_EXECUTOR_JSON_PATH: ${{ inputs.TEST_EXECUTOR_JSON_PATH }}
           ENTERPRISE_VERSION: ${{ inputs.ENTERPRISE_VERSION }}
-          RUN_PARALLEL: ${{ inputs.run_parallel }}
           ENTERPRISE_STATUS_TARGET_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           DEFAULT_DUMMY_JAR_URL: https://repo1.maven.org/maven2/junit/junit/4.13.2/junit-4.13.2.jar
           DEFAULT_DUMMY_ENTERPRISE_VERSION: 0.0.0-DUMMY
-          DEFAULT_TEST_EXECUTOR_PATH: tests/resources/test-executor-real.json
         run: |
           set -euo pipefail
-          if [ -z "${GH_TOKEN:-}" ]; then
+          if [ -z "${SPECMATIC_GITHUB_TOKEN:-}" ]; then
             echo "Missing SPECMATIC_GITHUB_TOKEN repository secret."
             echo "Add a fine-grained PAT or GitHub token with access to specmatic/specmatic-tests-orchestrator."
             exit 1
           fi
-          python3 - <<'PY'
-          import json
-          import os
 
-          enterprise_selector = os.environ.get("ENTERPRISE_VERSION", "").strip()
-          test_executor_path = os.environ.get("ORCHESTRATOR_TEST_EXECUTOR_PATH", "").strip()
-          jar_url = ""
-          enterprise_version = enterprise_selector
-          if not enterprise_selector:
-              raise SystemExit("ENTERPRISE_VERSION is required. Use 0.0.0-DUMMY for the default tester flow.")
-          if enterprise_selector == os.environ["DEFAULT_DUMMY_ENTERPRISE_VERSION"]:
-              jar_url = os.environ["DEFAULT_DUMMY_JAR_URL"]
-              if not test_executor_path:
-                  test_executor_path = os.environ["DEFAULT_TEST_EXECUTOR_PATH"]
-
-          for configuration in ("ubuntu-latest", "windows-latest"):
-              status_context = (
-                  "Ubuntu - Specmatic Orchestrator Gate"
-                  if configuration == "ubuntu-latest"
-                  else "Windows - Specmatic Orchestrator Gate"
-              )
-              payload = {
-                  "event_type": os.environ["ORCHESTRATOR_EVENT_TYPE"],
-                  "client_payload": {
-                      "enterprise_options": {
-                          "repository": os.environ["GITHUB_REPOSITORY"],
-                          "repository_name": os.environ["GITHUB_REPOSITORY"].split("/")[-1].capitalize(),
-                          "run_number": os.environ["GITHUB_RUN_NUMBER"],
-                          "sha": os.environ["GITHUB_SHA"],
-                          "run_id": os.environ["GITHUB_RUN_ID"],
-                          "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
-                          "version": enterprise_version,
-                          "status_context": status_context,
-                          "status_target_url": os.environ["ENTERPRISE_STATUS_TARGET_URL"],
-                          "configuration": configuration,
-                      },
-                      "orchestrator_options": {
-                          "run_parallel": os.environ.get("RUN_PARALLEL", "false"),
-                      },
-                  },
-              }
-              if jar_url:
-                  payload["client_payload"]["orchestrator_options"]["jar_url"] = jar_url
-              if test_executor_path:
-                  payload["client_payload"]["orchestrator_options"]["test_executor_path"] = test_executor_path
-              print(f"Repository dispatch payload for {configuration}:")
-              print(json.dumps(payload, indent=2, sort_keys=True))
-          PY
           enterprise_selector="${ENTERPRISE_VERSION:-}"
-          test_executor_path="${ORCHESTRATOR_TEST_EXECUTOR_PATH:-}"
-          jar_url=""
-          enterprise_version="${enterprise_selector}"
           if [ -z "${enterprise_selector}" ]; then
             echo "ENTERPRISE_VERSION is required. Use ${DEFAULT_DUMMY_ENTERPRISE_VERSION} for the default tester flow."
             exit 1
           fi
+
+          jar_url=""
           if [ "${enterprise_selector}" = "${DEFAULT_DUMMY_ENTERPRISE_VERSION}" ]; then
             jar_url="${DEFAULT_DUMMY_JAR_URL}"
-            if [ -z "${test_executor_path}" ]; then
-              test_executor_path="${DEFAULT_TEST_EXECUTOR_PATH}"
-            fi
             echo "Using default dummy jar for orchestrator-tester: ${jar_url}"
           else
             echo "Using Enterprise selector for orchestrator resolution: ${enterprise_selector}"
           fi
-          if [ -n "${test_executor_path}" ]; then
-            echo "Passing orchestrator manifest override: ${test_executor_path}"
+
+          test_executor_json=""
+          if [ -n "${TEST_EXECUTOR_JSON_PATH}" ]; then
+            if [ ! -f "${TEST_EXECUTOR_JSON_PATH}" ]; then
+              echo "Test executor JSON file not found: ${TEST_EXECUTOR_JSON_PATH}"
+              exit 1
+            fi
+            test_executor_json="$(cat "${TEST_EXECUTOR_JSON_PATH}")"
+            echo "Embedding test executor JSON from ${TEST_EXECUTOR_JSON_PATH}"
           fi
+
           repository_name="${GITHUB_REPOSITORY#*/}"
           repository_label="${repository_name^}"
 
@@ -235,26 +185,51 @@ jobs:
             else
               status_context="Windows - Specmatic Orchestrator Gate"
             fi
-            args=(
-              -f "event_type=${ORCHESTRATOR_EVENT_TYPE}"
-              -f "client_payload[enterprise_options][repository]=${GITHUB_REPOSITORY}"
-              -f "client_payload[enterprise_options][repository_name]=${repository_label}"
-              -f "client_payload[enterprise_options][run_number]=${GITHUB_RUN_NUMBER}"
-              -f "client_payload[enterprise_options][sha]=${GITHUB_SHA}"
-              -f "client_payload[enterprise_options][run_id]=${GITHUB_RUN_ID}"
-              -f "client_payload[enterprise_options][run_attempt]=${GITHUB_RUN_ATTEMPT}"
-              -f "client_payload[enterprise_options][version]=${enterprise_version}"
-              -f "client_payload[enterprise_options][status_context]=${status_context}"
-              -f "client_payload[enterprise_options][status_target_url]=${ENTERPRISE_STATUS_TARGET_URL}"
-              -f "client_payload[enterprise_options][configuration]=${configuration}"
-              -f "client_payload[orchestrator_options][run_parallel]=${RUN_PARALLEL}"
-            )
-            if [ -n "${jar_url}" ]; then
-              args+=(-f "client_payload[orchestrator_options][jar_url]=${jar_url}")
-            fi
-            if [ -n "${test_executor_path}" ]; then
-              args+=(-f "client_payload[orchestrator_options][test_executor_path]=${test_executor_path}")
-            fi
+
+            dispatch_payload="$(jq -n \
+              --arg event_type "${ORCHESTRATOR_EVENT_TYPE}" \
+              --arg repository "${GITHUB_REPOSITORY}" \
+              --arg repository_name "${repository_label}" \
+              --arg run_number "${GITHUB_RUN_NUMBER}" \
+              --arg sha "${GITHUB_SHA}" \
+              --arg run_id "${GITHUB_RUN_ID}" \
+              --arg run_attempt "${GITHUB_RUN_ATTEMPT}" \
+              --arg version "${enterprise_selector}" \
+              --arg status_context "${status_context}" \
+              --arg status_target_url "${ENTERPRISE_STATUS_TARGET_URL}" \
+              --arg configuration "${configuration}" \
+              --arg jar_url "${jar_url}" \
+              --arg test_executor_json "${test_executor_json}" \
+              '{
+                event_type: $event_type,
+                client_payload: {
+                  enterprise_options: {
+                    repository: $repository,
+                    repository_name: $repository_name,
+                    run_number: $run_number,
+                    sha: $sha,
+                    run_id: $run_id,
+                    run_attempt: $run_attempt,
+                    version: $version,
+                    status_context: $status_context,
+                    status_target_url: $status_target_url,
+                    configuration: $configuration
+                  },
+                  orchestrator_options: (
+                    {}
+                    + (if $jar_url == "" then {} else {jar_url: $jar_url} end)
+                    + (if $test_executor_json == "" then {} else {test_executor_json: $test_executor_json} end)
+                  )
+                }
+              }')"
+
+            echo "Repository dispatch payload for ${configuration}:"
+            echo "${dispatch_payload}"
             echo "Dispatching orchestrator for ${configuration}"
-            gh api "repos/${ORCHESTRATOR_REPOSITORY}/dispatches" -X POST "${args[@]}"
+            curl -sS --fail-with-body -X POST \
+              -H "Authorization: Bearer ${SPECMATIC_GITHUB_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/${ORCHESTRATOR_REPOSITORY}/dispatches" \
+              -d "${dispatch_payload}"
           done
