@@ -1,0 +1,9 @@
+[
+  {
+    "type": "sample-project",
+    "description": "Contract-style checks for the jar",
+    "github-url": "https://github.com/specmatic/specmatic-order-bff-java.git",
+    "branch": "main",
+    "enterprise-version": "${ENTERPRISE_VERSION}"
+  }
+]
