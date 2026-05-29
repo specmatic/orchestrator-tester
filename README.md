@@ -15,7 +15,7 @@ It is intentionally simple:
 - `src/Main.java`: tiny Java entrypoint for the jar
 - `scripts/build_jar.py`: compiles and packages the jar
 - `scripts/local_demo.py`: runs the end-to-end dry run locally
-- `resources/test-executor.json`: three sample source descriptors and their result profiles
+- `resources/test-executor.json`: caller-owned synthetic test executor manifest embedded into the orchestrator payload
 - `.github/workflows/trigger-orchestrator.yml`: production workflow sketch
 
 ## Local run
@@ -78,21 +78,21 @@ The intended tester flow in GitHub Actions is:
 2. Dispatch `specmatic/specmatic-tests-orchestrator` with:
    - a dummy `jar_url` by default: `https://repo1.maven.org/maven2/junit/junit/4.13.2/junit-4.13.2.jar`
    - `enterprise_version=0.0.0-DUMMY` by default
-   - `test_executor_path=tests/resources/orchestrator-tester-test-executor.json` by default
+   - `orchestrator_options.test_executor_json` read from [`resources/test-executor.json`](./resources/test-executor.json)
    - `enterprise_repository=specmatic/orchestrator-tester`
    - `enterprise_sha`
    - `enterprise_run_id`
    - `enterprise_run_attempt`
 3. Let the orchestrator publish `outputs/orchestration-summary.json` and update the original pending statuses directly.
 
-`ENTERPRISE_VERSION` must not be blank. Use the default `0.0.0-DUMMY` value for the lightweight tester flow. To test a real Enterprise artifact, replace it with a supported selector such as `1.12.1-SNAPSHOT`, `SNAPSHOT`, `RELEASE`, a Specmatic Enterprise repository URL, or a direct Enterprise jar URL. When a real selector is provided, the tester does not send the dummy jar URL; the orchestrator resolves the jar from the selector. Leave `ORCHESTRATOR_TEST_EXECUTOR_PATH` blank in that case to use the orchestrator's default real sample-project manifest, or provide a path to test another manifest.
+`ENTERPRISE_VERSION` must not be blank. Use the default `0.0.0-DUMMY` value for the lightweight tester flow. To test a real Enterprise artifact, replace it with a supported selector such as `1.12.1-SNAPSHOT`, `SNAPSHOT`, `RELEASE`, a Specmatic Enterprise repository URL, or a direct Enterprise jar URL. When a real selector is provided, the tester does not send the dummy jar URL; the orchestrator resolves the jar from the selector. The tester still owns the manifest and embeds its JSON content in the dispatch payload.
 
 The workflow file in [`.github/workflows/trigger-orchestrator.yml`](./.github/workflows/trigger-orchestrator.yml) now does this by:
 
 - using the small public dummy jar and synthetic manifest when `ENTERPRISE_VERSION` is `0.0.0-DUMMY`
 - failing early when `ENTERPRISE_VERSION` is blank
 - forwarding `ENTERPRISE_VERSION` without the dummy jar when you want the orchestrator to resolve a real Enterprise artifact
-- optionally forwarding `ORCHESTRATOR_TEST_EXECUTOR_PATH` when you want to test a specific manifest in the orchestrator repo
+- embedding [`resources/test-executor.json`](./resources/test-executor.json) as `orchestrator_options.test_executor_json` so the orchestrator stays caller-agnostic
 - dispatching `specmatic/specmatic-tests-orchestrator` once for Ubuntu and once for Windows
 - relying on the orchestrator callback to update the OS-scoped gate statuses, including the Details link to the exact orchestrator run
 - writing a short trigger summary with the gate contexts and orchestrator workflow link
@@ -109,3 +109,13 @@ The workflow file in [`.github/workflows/trigger-orchestrator.yml`](./.github/wo
    - the direct gate status update back to `specmatic/orchestrator-tester`
 5. Confirm the commit status popover shows `Ubuntu - Specmatic Orchestrator Gate` and `Windows - Specmatic Orchestrator Gate`.
 6. Confirm each gate's Details link points to the exact orchestrator run after the callback completes.
+
+## Manual trigger and results
+
+To test the full callback flow manually:
+
+1. Open **Actions -> Build and Trigger Orchestrator**.
+2. Click **Run workflow**.
+3. Leave `ENTERPRISE_VERSION` as `0.0.0-DUMMY` for the lightweight tester flow, or enter a real Enterprise selector/jar URL.
+4. Leave `TEST_EXECUTOR_JSON_PATH` as `resources/test-executor.json` unless you want to embed a different caller-owned manifest.
+During the run, the workflow summary shows the pending Ubuntu and Windows gate contexts plus the orchestrator workflow link. The orchestrator always dispatches the target workflows from the embedded manifest in parallel. After the orchestrator callback completes, see the final result in the commit status popover on the repository main page. Each gate's **Details** link points to the exact `specmatic-tests-orchestrator` run, whose artifacts include `outputs/orchestration-summary.json` and `outputs/index.html`.
