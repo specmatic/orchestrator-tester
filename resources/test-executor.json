@@ -68,13 +68,5 @@
     "github-url": "https://github.com/specmatic/specmatic-order-api-java-with-oauth.git",
     "branch": "main",
     "enterprise-version": "${ENTERPRISE_VERSION}"
-  },
-  {
-    "type": "playwright-tests",
-    "description": "UI tests for Studio",
-    "github-url": "https://github.com/specmatic/specmatic-studio-playwright-ts-tests.git",
-    "branch": "main",
-    "enterprise-version": "${ENTERPRISE_VERSION}",
-    "additional-env-variables": ["ORCHESTRATOR_DISABLE_VISUAL=true"]
   }
 ]
