@@ -1,0 +1,7 @@
+{
+  "type": "sample-project",
+  "description": "Contract test for Kafka Avro",
+  "github-url": "https://github.com/specmatic/specmatic-kafka-avro-sample.git",
+  "branch": "main",
+  "enterprise-version": "${ENTERPRISE_VERSION}"
+}
